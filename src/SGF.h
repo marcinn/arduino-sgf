@@ -11,6 +11,7 @@
 #include "SGF/SpriteCharacter.h"
 #include "SGF/Game.h"
 #include "SGF/Actions.h"
+#include "SGF/InputPin.h"
 #include "SGF/Scene.h"
 #include "SGF/Font5x7.h"
 #include "SGF/Collision.h"
