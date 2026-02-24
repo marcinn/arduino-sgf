@@ -107,6 +107,7 @@ void FastILI9341::hwReset() {
 void FastILI9341::screenRotation(uint8_t madctl) {
   cmd(0x36);  // MADCTL
   data(&madctl, 1);
+  updateDimensions(madctl);
 }
 
 bool FastILI9341::begin(uint32_t spi_hz, uint8_t madctl) {
@@ -150,24 +151,39 @@ bool FastILI9341::begin(uint32_t spi_hz, uint8_t madctl) {
 
   cmd(0x29);
   delay(20);  // DISPON
+  updateDimensions(madctl);
   return true;
+}
+
+void FastILI9341::updateDimensions(uint8_t madctl) {
+  // Portrait variants (with MV cleared) should expose H x W logical size.
+  // Landscape variants (with MV set) expose W x H.
+  bool portrait = (madctl == (uint8_t)ScreenRotation::Portrait) ||
+                  (madctl == (uint8_t)ScreenRotation::PortraitFlip);
+  if (portrait) {
+    curW = H;
+    curH = W;
+  } else {
+    curW = W;
+    curH = H;
+  }
 }
 
 void FastILI9341::fillScreen565(uint16_t color565) {
   // wysyłamy “swapped” w strumieniu
   uint16_t c = Color565::bswap(color565);
 
-  // pasek 320 * 10
+  // pasek maxWidth * 10
   static constexpr int STRIP_H = 10;
   static uint16_t strip[W * STRIP_H];
 
   for (int i = 0; i < W * STRIP_H; i++) strip[i] = c;
 
-  for (int y = 0; y < H; y += STRIP_H) {
-    int h = (y + STRIP_H <= H) ? STRIP_H : (H - y);
-    setWindow(0, y, W - 1, y + h - 1);
+  for (int y = 0; y < curH; y += STRIP_H) {
+    int h = (y + STRIP_H <= curH) ? STRIP_H : (curH - y);
+    setWindow(0, y, curW - 1, y + h - 1);
     streamBegin();
-    spi_buf b{ .buf = strip, .len = (uint32_t)(W * h * 2) };
+    spi_buf b{ .buf = strip, .len = (uint32_t)(curW * h * 2) };
     spi_buf_set s{ .buffers = &b, .count = 1 };
     (void)spi_write(spiDev, &spiCfg, &s);
     streamEnd();
@@ -185,9 +201,9 @@ void FastILI9341::fillRect565(int x0, int y0, int w, int h, uint16_t color565) {
     h += y0;
     y0 = 0;
   }
-  if (x0 >= W || y0 >= H) return;
-  if (x0 + w > W) w = W - x0;
-  if (y0 + h > H) h = H - y0;
+  if (x0 >= curW || y0 >= curH) return;
+  if (x0 + w > curW) w = curW - x0;
+  if (y0 + h > curH) h = curH - y0;
   if (w <= 0 || h <= 0) return;
 
   static constexpr int MAX_RW = 120;

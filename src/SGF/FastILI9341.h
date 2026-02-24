@@ -44,8 +44,8 @@ public:
   void fadeInBacklight(uint32_t durationMs) { fadeBacklightTo(BACKLIGHT_LEVEL_MAX, durationMs); }
   void fadeOutBacklight(uint32_t durationMs) { fadeBacklightTo(BACKLIGHT_LEVEL_MIN, durationMs); }
 
-  int width() const override { return W; }
-  int height() const override { return H; }
+  int width() const override { return curW; }
+  int height() const override { return curH; }
 
   void fillScreen565(uint16_t color565); // color w normalnym RGB565 (nie-swapped)
   void fillRect565(int x0, int y0, int w, int h, uint16_t color565);
@@ -60,12 +60,15 @@ private:
   int PIN_CS, PIN_DC, PIN_RST, PIN_LED;
   static constexpr int W = 320;
   static constexpr int H = 240;
+  int curW = W;
+  int curH = H;
 
   const struct device* spiDev = nullptr;
   struct spi_config spiCfg{};
   uint8_t backlightLevel = BACKLIGHT_LEVEL_MAX;
   uint32_t backlightPwmMaxValue = BACKLIGHT_LEVEL_MAX;
 
+  void updateDimensions(uint8_t madctl);
   void hwReset();
   void cmd(uint8_t c);
   void data(const uint8_t* d, size_t n);
