@@ -8,9 +8,11 @@
 // for a region is written into the buffer.
 class SpriteLayer {
 public:
-  enum class ScaleX {
+  enum class Scale {
     Normal,
-    DoubleWidth,
+    DoubleX,
+    DoubleY,
+    Double,
   };
 
   struct Sprite {
@@ -21,7 +23,24 @@ public:
     int h = 0;
     const uint16_t* pixels565 = nullptr;
     uint16_t transparent = 0;  // pixels matching this value are skipped
-    ScaleX scale = ScaleX::Normal;
+    Scale scale = Scale::Normal;
+    float anchorX = 0.0f;  // 0.0=left, 1.0=right (can be outside range)
+    float anchorY = 0.0f;  // 0.0=top, 1.0=bottom (can be outside range)
+
+    void setAnchor(float ax, float ay) {
+      anchorX = ax;
+      anchorY = ay;
+    }
+
+    void setPosition(int px, int py) {
+      x = px;
+      y = py;
+    }
+
+    void translate(int dx, int dy) {
+      x += dx;
+      y += dy;
+    }
   };
 
   struct Missile {
@@ -31,7 +50,7 @@ public:
     int w = 1;    // typically 1-2 px
     int h = 0;
     uint16_t color = 0xFFFF;
-    ScaleX scale = ScaleX::Normal;
+    Scale scale = Scale::Normal;
   };
 
   static constexpr int kMaxSprites = 8;
@@ -45,6 +64,8 @@ public:
 
   Sprite& sprite(int index);
   Missile& missile(int index);
+  static void spriteBounds(const Sprite& s, int* x0, int* y0, int* x1, int* y1);
+  static void spriteBoundsPadded(const Sprite& s, int pad, int* x0, int* y0, int* x1, int* y1);
 
   void renderRegion(int x0, int y0, int w, int h, uint16_t* buf) const;
 
