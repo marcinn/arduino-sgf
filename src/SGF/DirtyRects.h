@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include "IRenderTarget.h"
 
 struct Rect {
   int16_t x0, y0, x1, y1; // inclusive
@@ -10,6 +11,12 @@ public:
   static constexpr int MAX = 32;
 
   void clear() { n = 0; }
+  void invalidate(const IRenderTarget& target) {
+    clear();
+    if (target.width() > 0 && target.height() > 0) {
+      add(0, 0, target.width() - 1, target.height() - 1);
+    }
+  }
 
   bool add(int x0, int y0, int x1, int y1);
   void clip(int w, int h);

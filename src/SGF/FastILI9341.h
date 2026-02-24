@@ -1,12 +1,13 @@
 #pragma once
 #include <Arduino.h>
+#include "IRenderTarget.h"
 
 extern "C" {
   #include <zephyr/device.h>
   #include <zephyr/drivers/spi.h>
 }
 
-class FastILI9341 {
+class FastILI9341 : public IRenderTarget {
 public:
   enum class ScreenRotation : uint8_t {
     Landscape      = 0xE8,
@@ -22,6 +23,8 @@ public:
   static constexpr uint8_t MADCTL_ML  = 0x10;
   static constexpr uint8_t MADCTL_BGR = 0x08;
   static constexpr uint8_t MADCTL_MH  = 0x04;
+  static constexpr uint8_t BACKLIGHT_LEVEL_MIN = 0u;
+  static constexpr uint8_t BACKLIGHT_LEVEL_MAX = 255u;
 
   // piny: CS/DC/RST/LED (LED może być -1)
   FastILI9341(int cs, int dc, int rst, int led);
@@ -31,22 +34,27 @@ public:
   void setSPIFrequency(uint32_t spi_hz);
   void screenRotation(uint8_t madctl);
   void screenRotation(ScreenRotation rot) { screenRotation((uint8_t)rot); }
-  void setBacklight(uint8_t level);             // 0..255
+  void setBacklight(uint8_t level);  // normalized brightness 0..BACKLIGHT_LEVEL_MAX
   uint8_t backlight() const { return backlightLevel; }
-  void setBacklightPwmMax(uint32_t pwmMax) { backlightPwmMaxValue = pwmMax ? pwmMax : 255u; }
+  void setBacklightPwmMax(uint32_t pwmMax) {
+    backlightPwmMaxValue = pwmMax ? pwmMax : (uint32_t)BACKLIGHT_LEVEL_MAX;
+  }
   uint32_t backlightPwmMax() const { return backlightPwmMaxValue; }
   void fadeBacklightTo(uint8_t targetLevel, uint32_t durationMs);
-  void fadeInBacklight(uint32_t durationMs) { fadeBacklightTo(255, durationMs); }
-  void fadeOutBacklight(uint32_t durationMs) { fadeBacklightTo(0, durationMs); }
+  void fadeInBacklight(uint32_t durationMs) { fadeBacklightTo(BACKLIGHT_LEVEL_MAX, durationMs); }
+  void fadeOutBacklight(uint32_t durationMs) { fadeBacklightTo(BACKLIGHT_LEVEL_MIN, durationMs); }
 
-  int width()  const { return W; }
-  int height() const { return H; }
+  int width() const override { return W; }
+  int height() const override { return H; }
 
   void fillScreen565(uint16_t color565); // color w normalnym RGB565 (nie-swapped)
+  void fillRect565(int x0, int y0, int w, int h, uint16_t color565);
+  void drawText(int x, int y, const char* text, int scale, uint16_t color565);
+  void drawCenteredText(int y, const char* text, int scale, uint16_t color565);
 
   // Blit: wysyła bufor RGB565 (normalny endian) do prostokąta
   // bufor ma w*h pixeli, row-major
-  void blit565(int x0, int y0, int w, int h, const uint16_t* pix);
+  void blit565(int x0, int y0, int w, int h, const uint16_t* pix) override;
 
 private:
   int PIN_CS, PIN_DC, PIN_RST, PIN_LED;
@@ -55,8 +63,8 @@ private:
 
   const struct device* spiDev = nullptr;
   struct spi_config spiCfg{};
-  uint8_t backlightLevel = 255;
-  uint32_t backlightPwmMaxValue = 255;
+  uint8_t backlightLevel = BACKLIGHT_LEVEL_MAX;
+  uint32_t backlightPwmMaxValue = BACKLIGHT_LEVEL_MAX;
 
   void hwReset();
   void cmd(uint8_t c);

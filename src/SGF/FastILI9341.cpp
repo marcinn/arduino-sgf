@@ -1,5 +1,6 @@
 #include "FastILI9341.h"
 #include "SGF/Color565.h"
+#include "SGF/Font5x7.h"
 
 FastILI9341::FastILI9341(int cs, int dc, int rst, int led)
   : PIN_CS(cs), PIN_DC(dc), PIN_RST(rst), PIN_LED(led) {}
@@ -12,7 +13,8 @@ void FastILI9341::setBacklight(uint8_t level) {
   backlightLevel = level;
   if (PIN_LED < 0) return;
 
-  uint32_t pwm = ((uint32_t)level * backlightPwmMaxValue + 127u) / 255u;
+  uint32_t pwm =
+    ((uint32_t)level * backlightPwmMaxValue + (BACKLIGHT_LEVEL_MAX / 2u)) / BACKLIGHT_LEVEL_MAX;
 
   if (pwm == 0u) {
     digitalWrite(PIN_LED, LOW);
@@ -113,7 +115,7 @@ bool FastILI9341::begin(uint32_t spi_hz, uint8_t madctl) {
   if (PIN_RST >= 0) pinMode(PIN_RST, OUTPUT);
   if (PIN_LED >= 0) {
     pinMode(PIN_LED, OUTPUT);
-    setBacklight(255);
+    setBacklight(BACKLIGHT_LEVEL_MAX);
   }
 
   digitalWrite(PIN_CS, HIGH);
@@ -170,6 +172,57 @@ void FastILI9341::fillScreen565(uint16_t color565) {
     (void)spi_write(spiDev, &spiCfg, &s);
     streamEnd();
   }
+}
+
+void FastILI9341::fillRect565(int x0, int y0, int w, int h, uint16_t color565) {
+  if (w <= 0 || h <= 0) return;
+
+  if (x0 < 0) {
+    w += x0;
+    x0 = 0;
+  }
+  if (y0 < 0) {
+    h += y0;
+    y0 = 0;
+  }
+  if (x0 >= W || y0 >= H) return;
+  if (x0 + w > W) w = W - x0;
+  if (y0 + h > H) h = H - y0;
+  if (w <= 0 || h <= 0) return;
+
+  static constexpr int MAX_RW = 120;
+  static constexpr int MAX_RH = 80;
+  static uint16_t rectBuf[MAX_RW * MAX_RH];
+
+  for (int ty = 0; ty < h; ty += MAX_RH) {
+    int hh = min(MAX_RH, h - ty);
+    for (int tx = 0; tx < w; tx += MAX_RW) {
+      int ww = min(MAX_RW, w - tx);
+      int n = ww * hh;
+      for (int i = 0; i < n; i++) rectBuf[i] = color565;
+      blit565(x0 + tx, y0 + ty, ww, hh, rectBuf);
+    }
+  }
+}
+
+void FastILI9341::drawText(int x, int y, const char* text, int scale, uint16_t color565) {
+  if (!text || scale <= 0) return;
+
+  const int w = Font5x7::textWidth(text, scale);
+  const int h = 7 * scale;
+  for (int yy = 0; yy < h; yy++) {
+    for (int xx = 0; xx < w; xx++) {
+      if (Font5x7::textPixel(text, scale, xx, yy)) {
+        fillRect565(x + xx, y + yy, 1, 1, color565);
+      }
+    }
+  }
+}
+
+void FastILI9341::drawCenteredText(int y, const char* text, int scale, uint16_t color565) {
+  if (!text) return;
+  int x = (width() - Font5x7::textWidth(text, scale)) / 2;
+  drawText(x, y, text, scale, color565);
 }
 
 void FastILI9341::blit565(int x0, int y0, int w, int h, const uint16_t* pix) {
