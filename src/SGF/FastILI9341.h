@@ -48,31 +48,6 @@ public:
   // bufor ma w*h pixeli, row-major
   void blit565(int x0, int y0, int w, int h, const uint16_t* pix);
 
-  // Pomocnicze: konwersja RGB->565 + swap (do trzymania w buforze już “ready”)
-  static inline uint16_t rgb565(uint8_t r,uint8_t g,uint8_t b){
-    return (uint16_t)(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | ((b & 0xF8) >> 3));
-  }
-  static inline uint16_t bswap16(uint16_t v){ return (uint16_t)((v<<8)|(v>>8)); }
-  static inline uint16_t lighten565(uint16_t c){
-    auto clamp = [](int v, int lo, int hi){ return v < lo ? lo : (v > hi ? hi : v); };
-    int r = (c >> 11) & 0x1F;
-    int g = (c >> 5) & 0x3F;
-    int b = c & 0x1F;
-    r = clamp(r + ((r / 3) > 0 ? (r / 3) : 1), 0, 31);
-    g = clamp(g + ((g / 3) > 0 ? (g / 3) : 1), 0, 63);
-    b = clamp(b + ((b / 3) > 0 ? (b / 3) : 1), 0, 31);
-    return (uint16_t)((r << 11) | (g << 5) | b);
-  }
-  static inline uint16_t darken565(uint16_t c){
-    int r = (c >> 11) & 0x1F;
-    int g = (c >> 5) & 0x3F;
-    int b = c & 0x1F;
-    r = (r * 2) / 3;
-    g = (g * 2) / 3;
-    b = (b * 2) / 3;
-    return (uint16_t)((r << 11) | (g << 5) | b);
-  }
-
 private:
   int PIN_CS, PIN_DC, PIN_RST, PIN_LED;
   static constexpr int W = 320;

@@ -17,9 +17,9 @@ void Game::start() {
 }
 
 void Game::loop() {
-  float dtSec = tickSeconds(micros());
-  onPhysics(dtSec);
-  onProcess(dtSec);
+  float delta = tickSeconds(micros());
+  onPhysics(delta);
+  onProcess(delta);
 }
 
 void Game::resetClock() {

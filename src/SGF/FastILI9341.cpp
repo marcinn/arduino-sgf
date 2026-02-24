@@ -1,4 +1,5 @@
 #include "FastILI9341.h"
+#include "SGF/Color565.h"
 
 FastILI9341::FastILI9341(int cs, int dc, int rst, int led)
   : PIN_CS(cs), PIN_DC(dc), PIN_RST(rst), PIN_LED(led) {}
@@ -152,7 +153,7 @@ bool FastILI9341::begin(uint32_t spi_hz, uint8_t madctl) {
 
 void FastILI9341::fillScreen565(uint16_t color565) {
   // wysyłamy “swapped” w strumieniu
-  uint16_t c = bswap16(color565);
+  uint16_t c = Color565::bswap(color565);
 
   // pasek 320 * 10
   static constexpr int STRIP_H = 10;
@@ -178,7 +179,7 @@ void FastILI9341::blit565(int x0, int y0, int w, int h, const uint16_t* pix) {
   // Bufor max: narzuca caller (ty w grze) poprzez wielkość dirty rect.
   static uint16_t tmp[120 * 80];  // dopasuj do MAX_RW*MAX_RH w grze
   const int n = w * h;
-  for (int i = 0; i < n; i++) tmp[i] = bswap16(pix[i]);
+  for (int i = 0; i < n; i++) tmp[i] = Color565::bswap(pix[i]);
 
   setWindow(x0, y0, x0 + w - 1, y0 + h - 1);
   streamBegin();

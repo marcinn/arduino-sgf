@@ -13,8 +13,8 @@ public:
 
 protected:
   virtual void onSetup() = 0;
-  virtual void onPhysics(float dtSec) = 0;
-  virtual void onProcess(float dtSec) = 0;
+  virtual void onPhysics(float delta) = 0;
+  virtual void onProcess(float delta) = 0;
 
 private:
   struct FrameClock {

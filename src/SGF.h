@@ -1,4 +1,5 @@
 #pragma once
+#include "SGF/Color565.h"
 #include "SGF/FastILI9341.h"
 #include "SGF/DirtyRects.h"
 #include "SGF/TileFlusher.h"
@@ -6,5 +7,7 @@
 #include "SGF/RectFlashAnim.h"
 #include "SGF/IRenderTarget.h"
 #include "SGF/Game.h"
+#include "SGF/Actions.h"
+#include "SGF/Scene.h"
 #include "SGF/Font5x7.h"
 #include "SGF/Collision.h"
