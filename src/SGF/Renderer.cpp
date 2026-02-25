@@ -41,6 +41,7 @@ public:
     const int fixedEndStart = fixedStart + scrollSpan;
     const int offset = (int)scroller_.offset();
     const bool alongY = scroller_.scrollsAlongY();
+    const bool inverted = scroller_.axisInverted();
 
     if (alongY) {
       int row = 0;
@@ -61,7 +62,9 @@ public:
 
         // Scroll area: split if the physical address wraps inside this tile.
         const int localY = sy - fixedStart;
-        const int physLocalY = (offset + localY) % scrollSpan;
+        int physLocalY = inverted ? (localY - offset) : (offset + localY);
+        while (physLocalY >= scrollSpan) physLocalY -= scrollSpan;
+        while (physLocalY < 0) physLocalY += scrollSpan;
         const int physY = fixedStart + physLocalY;
         const int bySource = std::min(h - row, fixedEndStart - sy);
         const int byWrap = scrollSpan - physLocalY;
@@ -91,7 +94,9 @@ public:
       }
 
       const int localX = sx - fixedStart;
-      const int physLocalX = (offset + localX) % scrollSpan;
+      int physLocalX = inverted ? (localX - offset) : (offset + localX);
+      while (physLocalX >= scrollSpan) physLocalX -= scrollSpan;
+      while (physLocalX < 0) physLocalX += scrollSpan;
       const int physX = fixedStart + physLocalX;
       const int bySource = std::min(w - col, fixedEndStart - sx);
       const int byWrap = scrollSpan - physLocalX;
@@ -172,6 +177,7 @@ void Renderer::resetScrollAccumulator() {
 void Renderer::addSpriteGhosts(int delta) {
   if (delta == 0) return;
   const bool alongY = scroller_.scrollsAlongY();
+  const int screenShift = scroller_.axisInverted() ? delta : -delta;
   for (int i = 0; i < SpriteLayer::kMaxSprites; ++i) {
     const auto& s = sprites_.sprite(i);
     if (!s.active) continue;
@@ -182,11 +188,11 @@ void Renderer::addSpriteGhosts(int delta) {
     // Ghost left behind after the screen content shifts by `delta`.
     Rect g = r;
     if (alongY) {
-      g.y0 -= delta;
-      g.y1 -= delta;
+      g.y0 += screenShift;
+      g.y1 += screenShift;
     } else {
-      g.x0 -= delta;
-      g.x1 -= delta;
+      g.x0 += screenShift;
+      g.x1 += screenShift;
     }
     dirty_.add(g.x0, g.y0, g.x1, g.y1);
   }

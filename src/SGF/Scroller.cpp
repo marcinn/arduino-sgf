@@ -32,6 +32,7 @@ void HardwareScroller::scroll(int delta,
   // Split large deltas into chunks so the strip buffer always fits.
   int remaining = delta;
   const bool alongY = scrollsAlongY();
+  const bool inverted = axisInverted();
   const int cross = alongY ? gfx.width() : gfx.height();
 
   auto stepOnce = [&](int step) {
@@ -45,17 +46,12 @@ void HardwareScroller::scroll(int delta,
     // Logical offset of the first visible unit in the scroll area.
     worldTop_ += step;
 
-    // Newly exposed strip position in scroll-area coordinates.
+    // Newly exposed strip position in logical screen coordinates on the active axis.
     const int stripSpan = std::abs(step);
-    int stripPhys = 0;
-    if (step > 0) {
-      // Positive step reveals a strip at the end of the visible window.
-      stripPhys = offset_ + scrollH_ - stripSpan;
-      if (stripPhys >= (int)scrollH_) stripPhys -= (int)scrollH_;
-    } else {
-      // Negative step reveals a strip at the start (offset points to the new start).
-      stripPhys = offset_;
-    }
+    const int screenStripStart = (step > 0) ? ((int)scrollH_ - stripSpan) : 0;
+    int stripPhys = inverted ? (screenStripStart - (int)offset_) : ((int)offset_ + screenStripStart);
+    while (stripPhys >= (int)scrollH_) stripPhys -= (int)scrollH_;
+    while (stripPhys < 0) stripPhys += (int)scrollH_;
 
     // Logical coordinate of the exposed strip (for world generation).
     const int32_t worldOffset = (step > 0) ? (worldTop_ + scrollH_ - stripSpan) : worldTop_;

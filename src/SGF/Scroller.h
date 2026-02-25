@@ -47,6 +47,7 @@ public:
               const BlitStripFn& blitStrip = {});
 
   bool scrollsAlongY() const { return gfx.height() >= gfx.width(); }
+  bool axisInverted() const { return gfx.scrollAxisInverted(); }
   uint16_t axisLength() const { return (uint16_t)(scrollsAlongY() ? gfx.height() : gfx.width()); }
   uint16_t crossLength() const { return (uint16_t)(scrollsAlongY() ? gfx.width() : gfx.height()); }
 

@@ -34,6 +34,9 @@ public:
   void setSPIFrequency(uint32_t spi_hz);
   void screenRotation(uint8_t madctl);
   void screenRotation(ScreenRotation rot) { screenRotation((uint8_t)rot); }
+  uint8_t rotationMadctl() const { return rotationMadctl_; }
+  // The ILI9341 vertical-scroll axis is mirrored when MADCTL_MY is set.
+  bool scrollAxisInverted() const { return (rotationMadctl_ & MADCTL_MY) != 0; }
   void setBacklight(uint8_t level);  // normalized brightness 0..BACKLIGHT_LEVEL_MAX
   uint8_t backlight() const { return backlightLevel; }
   void setBacklightPwmMax(uint32_t pwmMax) {
@@ -73,6 +76,7 @@ private:
   struct spi_config spiCfg{};
   uint8_t backlightLevel = BACKLIGHT_LEVEL_MAX;
   uint32_t backlightPwmMaxValue = BACKLIGHT_LEVEL_MAX;
+  uint8_t rotationMadctl_ = (uint8_t)ScreenRotation::Landscape;
 
   void updateDimensions(uint8_t madctl);
   void hwReset();

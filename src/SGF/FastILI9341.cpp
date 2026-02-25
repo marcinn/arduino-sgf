@@ -119,6 +119,7 @@ void FastILI9341::hwReset() {
 }
 
 void FastILI9341::screenRotation(uint8_t madctl) {
+  rotationMadctl_ = madctl;
   cmd(0x36);  // MADCTL
   data(&madctl, 1);
   updateDimensions(madctl);
