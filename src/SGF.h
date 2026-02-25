@@ -4,6 +4,8 @@
 #include "SGF/DirtyRects.h"
 #include "SGF/TileFlusher.h"
 #include "SGF/Sprites.h"
+#include "SGF/Scroller.h"
+#include "SGF/Renderer.h"
 #include "SGF/RectFlashAnim.h"
 #include "SGF/IRenderTarget.h"
 #include "SGF/Vector2.h"
