@@ -94,6 +94,20 @@ void FastILI9341::setWindow(int x0, int y0, int x1, int y1) {
   cmd(0x2C);
 }
 
+void FastILI9341::setScrollArea(uint16_t topFixed, uint16_t scrollHeight, uint16_t bottomFixed) {
+  // VSCRDEF (0x33): 3 words: TFA, VSA, BFA
+  uint16_t def[3] = { be16(topFixed), be16(scrollHeight), be16(bottomFixed) };
+  cmd(0x33);
+  data((uint8_t*)def, 6);
+}
+
+void FastILI9341::scrollTo(uint16_t yOff) {
+  // VSCRSADD (0x37): 1 word, scroll start address (0..VSA-1)
+  uint16_t off = be16(yOff);
+  cmd(0x37);
+  data((uint8_t*)&off, 2);
+}
+
 void FastILI9341::hwReset() {
   if (PIN_RST < 0) return;
   digitalWrite(PIN_RST, HIGH);

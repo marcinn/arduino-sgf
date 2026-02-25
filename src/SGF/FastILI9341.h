@@ -56,6 +56,12 @@ public:
   // bufor ma w*h pixeli, row-major
   void blit565(int x0, int y0, int w, int h, const uint16_t* pix) override;
 
+  // Sprzętowy vertical scroll ILI9341
+  // top/height/bottom muszą sumować się do height() w aktualnej orientacji
+  void setScrollArea(uint16_t topFixed, uint16_t scrollHeight, uint16_t bottomFixed);
+  // yOff zawija się mod height(); 0 = topFixed w górnym rogu
+  void scrollTo(uint16_t yOff);
+
 private:
   int PIN_CS, PIN_DC, PIN_RST, PIN_LED;
   static constexpr int W = 320;
