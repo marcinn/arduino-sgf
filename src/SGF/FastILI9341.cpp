@@ -138,7 +138,7 @@ bool FastILI9341::begin(uint32_t spi_hz, uint8_t madctl) {
   digitalWrite(PIN_DC, HIGH);
   if (PIN_RST >= 0) digitalWrite(PIN_RST, HIGH);
 
-  // UNO Q (Zephyr core): bierzemy spi2 jak wcześniej
+  // UNO Q (Zephyr core): use spi2 as in the existing board setup.
   spiDev = DEVICE_DT_GET(DT_NODELABEL(spi2));
   if (!spiDev || !device_is_ready(spiDev)) return false;
 
@@ -185,10 +185,10 @@ void FastILI9341::updateDimensions(uint8_t madctl) {
 }
 
 void FastILI9341::fillScreen565(uint16_t color565) {
-  // wysyłamy “swapped” w strumieniu
+  // Stream byte-swapped RGB565 (ILI9341 expects big-endian words).
   uint16_t c = Color565::bswap(color565);
 
-  // pasek maxWidth * 10
+  // Temporary strip buffer: maxWidth * 10 rows.
   static constexpr int STRIP_H = 10;
   static uint16_t strip[W * STRIP_H];
 
@@ -259,9 +259,9 @@ void FastILI9341::drawCenteredText(int y, const char* text, int scale, uint16_t 
 void FastILI9341::blit565(int x0, int y0, int w, int h, const uint16_t* pix) {
   if (w <= 0 || h <= 0) return;
 
-  // ILI9341 chce big-endian. Konwertujemy do tymczasowego bufora “swapped”.
-  // Bufor max: narzuca caller (ty w grze) poprzez wielkość dirty rect.
-  static uint16_t tmp[120 * 80];  // dopasuj do MAX_RW*MAX_RH w grze
+  // ILI9341 expects big-endian words. Convert into a temporary swapped buffer.
+  // Maximum size is constrained by caller-side dirty/tile dimensions.
+  static uint16_t tmp[120 * 80];  // Keep in sync with typical region/tile limits.
   const int n = w * h;
   for (int i = 0; i < n; i++) tmp[i] = Color565::bswap(pix[i]);
 

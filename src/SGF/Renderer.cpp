@@ -14,10 +14,7 @@ static void blitSubRectRows(FastILI9341& gfx,
                             int srcX) {
   if (w <= 0 || h <= 0 || !src) return;
 
-  // Fast path: the requested sub-rect is the full source region, so the pixel
-  // data is contiguous and can be sent in a single SPI transfer. This avoids
-  // row-by-row blits in the common landscape dirty-tile case and reduces
-  // visible tearing/smear artifacts.
+  // Use a single transfer when the requested sub-rect is contiguous.
   if (srcX == 0 && srcStride == w) {
     gfx.blit565(dstX, dstY, w, h, src);
     return;
@@ -194,7 +191,7 @@ void Renderer::addSpriteGhosts(int delta) {
   if (delta == 0) return;
   const bool alongY = scroller_.scrollsAlongY();
   const int screenShift = -delta;
-  constexpr int ghostPad = 1;  // defensive pad for edge pixels on wrapped hardware-scroll redraws
+  constexpr int ghostPad = 1;  // Covers edge pixels at tile/sprite boundaries.
   for (int i = 0; i < SpriteLayer::kMaxSprites; ++i) {
     const auto& s = sprites_.sprite(i);
     if (!s.active) continue;
@@ -216,7 +213,6 @@ void Renderer::addSpriteGhosts(int delta) {
       g.x1 += screenShift;
     }
     dirty_.add(g.x0, g.y0, g.x1, g.y1);
-
   }
 }
 

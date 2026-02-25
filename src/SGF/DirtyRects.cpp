@@ -21,7 +21,7 @@ bool DirtyRects::add(int x0, int y0, int x1, int y1) {
   if (x1 < x0 || y1 < y0) return false;
   Rect nr{(int16_t)x0,(int16_t)y0,(int16_t)x1,(int16_t)y1};
 
-  // Spróbuj od razu scalać z istniejącymi, żeby nie puchło
+  // Merge eagerly with existing rects to avoid growth.
   for (int i=0;i<n;i++) {
     if (overlapsOrTouches(r[i], nr)) {
       r[i] = unite(r[i], nr);
@@ -30,7 +30,7 @@ bool DirtyRects::add(int x0, int y0, int x1, int y1) {
   }
 
   if (n >= MAX) {
-    // gdy brak miejsca: brutalny fallback — połącz wszystko w jeden duży rect
+    // Out of slots: fallback to one large union rect.
     if (n == 0) { r[0] = nr; n = 1; return true; }
     r[0] = unite(r[0], nr);
     for (int i=1;i<n;i++) r[0] = unite(r[0], r[i]);
@@ -49,7 +49,7 @@ void DirtyRects::clip(int w, int h) {
     if (r[i].x1 >= w) r[i].x1 = w-1;
     if (r[i].y1 >= h) r[i].y1 = h-1;
     if (r[i].x1 < r[i].x0 || r[i].y1 < r[i].y0) {
-      // usuń pusty
+      // Remove empty rect.
       r[i] = r[n-1];
       n--;
       i--;

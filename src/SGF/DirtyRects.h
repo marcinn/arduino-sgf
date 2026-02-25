@@ -24,7 +24,7 @@ public:
   int count() const { return n; }
   const Rect& operator[](int i) const { return r[i]; }
 
-  // Prosty merge: jeśli recty się przecinają lub stykają, łączy.
+  // Simple merge: joins rects that overlap or touch.
   void mergeAll();
 
 private:
