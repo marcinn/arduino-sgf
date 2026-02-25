@@ -2,6 +2,68 @@
 
 #include <algorithm>
 
+namespace {
+
+// Maps logical screen Y to physical GRAM rows while hardware vertical scroll is active.
+// TileFlusher works in screen coordinates, so Renderer::flush uses this adapter to blit
+// dirty tiles into the correct RAM rows (including wrap inside the scroll region).
+class ScrolledRenderTarget : public IRenderTarget {
+public:
+  ScrolledRenderTarget(FastILI9341& gfx, const HardwareScroller& scroller)
+    : gfx_(gfx), scroller_(scroller) {}
+
+  int width() const override { return gfx_.width(); }
+  int height() const override { return gfx_.height(); }
+
+  void blit565(int x0, int y0, int w, int h, const uint16_t* pix) override {
+    if (!pix || w <= 0 || h <= 0) return;
+
+    const int top = (int)scroller_.topFixed();
+    const int scrollH = (int)scroller_.scrollHeight();
+    if (scrollH <= 0) {
+      gfx_.blit565(x0, y0, w, h, pix);
+      return;
+    }
+
+    const int bottom = top + scrollH;
+    const int offset = (int)scroller_.offset();
+
+    int row = 0;
+    while (row < h) {
+      const int sy = y0 + row;
+
+      // Fixed areas are not remapped by hardware scroll.
+      if (sy < top) {
+        const int segH = std::min(h - row, top - sy);
+        gfx_.blit565(x0, sy, w, segH, pix + row * w);
+        row += segH;
+        continue;
+      }
+      if (sy >= bottom) {
+        gfx_.blit565(x0, sy, w, h - row, pix + row * w);
+        return;
+      }
+
+      // Scroll area: split if the physical address wraps inside this tile.
+      const int localY = sy - top;
+      const int physLocalY = (offset + localY) % scrollH;
+      const int physY = top + physLocalY;
+      const int bySource = std::min(h - row, bottom - sy);
+      const int byWrap = scrollH - physLocalY;
+      const int segH = std::min(bySource, byWrap);
+
+      gfx_.blit565(x0, physY, w, segH, pix + row * w);
+      row += segH;
+    }
+  }
+
+private:
+  FastILI9341& gfx_;
+  const HardwareScroller& scroller_;
+};
+
+}  // namespace
+
 Renderer::Renderer(FastILI9341& gfx,
                    HardwareScroller& scroller,
                    SpriteLayer& sprites,
@@ -84,8 +146,9 @@ static int32_t worldYFromScreenY(const HardwareScroller& scroller, int y) {
 void Renderer::flush(uint16_t* regionBuf) {
   if (!regionBuf) return;
 
+  ScrolledRenderTarget target(gfx_, scroller_);
   flusher_.flush(
-    gfx_,
+    target,
     regionBuf,
     [&](int x0, int y0, int w, int h, uint16_t* buf) {
       int32_t worldY = worldYFromScreenY(scroller_, y0);
