@@ -150,17 +150,28 @@ void Renderer::scroll(int delta, uint16_t* stripBuf, int maxStripLines) {
     stripBuf,
     maxStripLines,
     [&](int32_t worldOffset, int span, uint16_t* buf) {
+      Renderer::StripDesc strip{};
+      strip.alongY = scroller_.scrollsAlongY();
+      strip.span = span;
+      if (strip.alongY) {
+        strip.w = gfx_.width();
+        strip.h = span;
+        strip.worldX0 = 0;
+        strip.worldY0 = worldOffset;
+      } else {
+        strip.w = span;
+        strip.h = gfx_.height();
+        strip.worldX0 = worldOffset;
+        strip.worldY0 = 0;
+      }
+
       if (stripFn_) {
-        stripFn_(worldOffset, span, buf);
+        stripFn_(strip, buf);
       } else if (bgFn_) {
         // Fallback strip render via the main background callback.
-        if (scroller_.scrollsAlongY()) {
-          bgFn_(0, 0, gfx_.width(), span, 0, worldOffset, buf);
-        } else {
-          bgFn_(0, 0, span, gfx_.height(), worldOffset, 0, buf);
-        }
+        bgFn_(0, 0, strip.w, strip.h, strip.worldX0, strip.worldY0, buf);
       } else {
-        const int count = (scroller_.scrollsAlongY() ? (gfx_.width() * span) : (span * gfx_.height()));
+        const int count = strip.w * strip.h;
         std::fill(buf, buf + count, (uint16_t)0);
       }
     });
@@ -216,6 +227,38 @@ void Renderer::addSpriteGhosts(int delta) {
   }
 }
 
+void Renderer::trackSpriteChanges() {
+  for (int i = 0; i < SpriteLayer::kMaxSprites; ++i) {
+    const auto& s = sprites_.sprite(i);
+    Rect cur{};
+    const bool curActive = s.active;
+    if (curActive) {
+      spriteBounds(s, &cur);
+    }
+
+    auto& snap = spriteSnapshots_[i];
+    bool changed = (snap.active != curActive);
+    if (!changed && curActive) {
+      changed = (snap.bounds.x0 != cur.x0) || (snap.bounds.y0 != cur.y0) ||
+                (snap.bounds.x1 != cur.x1) || (snap.bounds.y1 != cur.y1);
+    }
+
+    if (changed) {
+      if (snap.active) {
+        dirty_.add(snap.bounds.x0, snap.bounds.y0, snap.bounds.x1, snap.bounds.y1);
+      }
+      if (curActive) {
+        dirty_.add(cur.x0, cur.y0, cur.x1, cur.y1);
+      }
+    }
+
+    snap.active = curActive;
+    if (curActive) {
+      snap.bounds = cur;
+    }
+  }
+}
+
 void Renderer::markSpriteMovement(const Rect& oldRect, const Rect& newRect) {
   dirty_.add(oldRect.x0, oldRect.y0, oldRect.x1, oldRect.y1);
   dirty_.add(newRect.x0, newRect.y0, newRect.x1, newRect.y1);
@@ -239,6 +282,8 @@ static int32_t worldOffsetFromScreenCoord(const HardwareScroller& scroller, int 
 
 void Renderer::flush(uint16_t* regionBuf) {
   if (!regionBuf) return;
+
+  trackSpriteChanges();
 
   ScrolledRenderTarget target(gfx_, scroller_);
   flusher_.flush(

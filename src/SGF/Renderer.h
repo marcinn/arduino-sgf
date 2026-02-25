@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <functional>
 #include <stdint.h>
 
@@ -13,8 +14,15 @@
 class Renderer {
 public:
   using BackgroundFn = std::function<void(int x0, int y0, int w, int h, int32_t worldX0, int32_t worldY0, uint16_t* buf)>;
-  // `worldOffset`/`span` are on the active scroll axis (see HardwareScroller).
-  using StripFn      = std::function<void(int32_t worldOffset, int span, uint16_t* buf)>;
+  struct StripDesc {
+    bool alongY = true;   // Active hardware-scroll axis in screen space.
+    int span = 0;         // Strip thickness on the active axis.
+    int w = 0;            // Buffer width.
+    int h = 0;            // Buffer height.
+    int32_t worldX0 = 0;  // Background world origin for the strip buffer.
+    int32_t worldY0 = 0;
+  };
+  using StripFn = std::function<void(const StripDesc& strip, uint16_t* buf)>;
 
   Renderer(FastILI9341& gfx,
            HardwareScroller& scroller,
@@ -33,7 +41,8 @@ public:
   void scrollByVelocity(int speedPxPerSec, uint32_t dtMs, uint16_t* stripBuf, int maxStripLines);
   void resetScrollAccumulator();
 
-  // Marks sprite movement when sprite coordinates are updated manually.
+  // Optional manual dirty mark for callers that want explicit control.
+  // Renderer also auto-tracks sprite bounds across flushes.
   void markSpriteMovement(const Rect& oldRect, const Rect& newRect);
 
   // Forces a full-screen redraw on the next flush.
@@ -54,7 +63,13 @@ private:
   int tileW_;
   int tileH_;
   int32_t scrollAccumMilliPx_ = 0;  // signed accumulator: px*ms/s remainder in [-999, 999]
+  struct SpriteSnapshot {
+    bool active = false;
+    Rect bounds{0, 0, 0, 0};
+  };
+  std::array<SpriteSnapshot, SpriteLayer::kMaxSprites> spriteSnapshots_{};
 
   void addSpriteGhosts(int delta);
+  void trackSpriteChanges();
   static void spriteBounds(const SpriteLayer::Sprite& s, Rect* out);
 };

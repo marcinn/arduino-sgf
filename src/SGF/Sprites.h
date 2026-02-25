@@ -32,6 +32,43 @@ public:
       anchorY = ay;
     }
 
+    void setScale(Scale newScale) {
+      if (scale == newScale) return;
+      scale = newScale;
+      redraw();
+    }
+
+    void setBitmap(const uint16_t* pixels, int width, int height) {
+      bool changed = (pixels565 != pixels) || (w != width) || (h != height);
+      pixels565 = pixels;
+      w = width;
+      h = height;
+      if (changed) {
+        redraw();
+      }
+    }
+
+    void setBitmap(const uint16_t* pixels, int width, int height, uint16_t transparentColor) {
+      bool changed = (transparent != transparentColor);
+      setBitmap(pixels, width, height);
+      transparent = transparentColor;
+      if (changed) {
+        redraw();
+      }
+    }
+
+    void setTransparent(uint16_t transparentColor) {
+      if (transparent == transparentColor) return;
+      transparent = transparentColor;
+      redraw();
+    }
+
+    void setActive(bool enabled) {
+      if (active == enabled) return;
+      active = enabled;
+      redraw();
+    }
+
     void setPosition(int px, int py) {
       x = px;
       y = py;
@@ -41,6 +78,15 @@ public:
       x += dx;
       y += dy;
     }
+
+    // Schedules redraw of the current bounds on the next Renderer::flush().
+    // Use this when visual content changes without changing sprite bounds.
+    void redraw() { ++redrawRevision_; }
+
+    uint32_t redrawRevision() const { return redrawRevision_; }
+
+  private:
+    uint32_t redrawRevision_ = 1;
   };
 
   struct Missile {

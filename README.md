@@ -211,19 +211,11 @@ void setup() {
     [&](int x0,int y0,int w,int h,int32_t wx,int32_t wy,uint16_t* buf){
       drawBackground(wx, wy, w, h, buf);   // active scroll axis is already mapped into wx/wy
     });
-  renderer.setStripRenderer(
-    [&](int32_t worldOffset,int span,uint16_t* buf){
-      if (scroller.scrollsAlongY()) {
-        drawBackground(0, worldOffset, gfx.width(), span, buf);
-      } else {
-        drawBackground(worldOffset, 0, span, gfx.height(), buf);
-      }
-    });
 }
 
 void loopFrame(int d) { // d>0 moves forward on the active scroll axis
   renderer.scroll(d, stripBuf, 16);       // hardware scroll + sprite ghost cleanup
-  updateSprites(sprites);                 // move sprites, call renderer.markSpriteMovement if needed
+  updateSprites(sprites);                 // move sprites; Renderer auto-tracks sprite bounds
   renderer.flush(regionBuf);              // redraw only dirty tiles (background + sprites)
 }
 ```
@@ -231,5 +223,8 @@ void loopFrame(int d) { // d>0 moves forward on the active scroll axis
 Key points:
 - `scroll` uses ILI9341 VSCRDEF/VSCRSADD (single-axis hardware scroll); only the newly exposed strip is drawn.
 - Rotation defines the visible axis: portrait behaves like vertical scrolling, landscape behaves like horizontal scrolling.
-- Sprite ghosting is handled by marking sprite bounds before/after the scroll so they are redrawn in place.
+- `setStripRenderer(...)` is optional. Without it, `Renderer` renders the exposed strip via `BackgroundFn`.
+- If used, `StripFn` receives a `StripDesc` (axis + `w/h` + world origin) so the callback does not need to query `Scroller`.
+- `Renderer::scroll(...)` marks sprite ghost regions caused by hardware scroll.
+- Sprite movement dirty rects are auto-tracked across `flush()` calls (`markSpriteMovement(...)` remains optional).
 - `Renderer` combines background render, sprite overlay, and tile-based dirty flushing to minimize SPI traffic.
