@@ -81,6 +81,15 @@ void SpriteLayer::spriteBounds(const Sprite& s, int* x0, int* y0, int* x1, int* 
   if (y1) *y1 = bottom;
 }
 
+void SpriteLayer::spriteBounds(const Sprite& s, int16_t* x0, int16_t* y0, int16_t* x1, int16_t* y1) {
+  int lx = 0, ly = 0, rx = 0, ry = 0;
+  spriteBounds(s, &lx, &ly, &rx, &ry);
+  if (x0) *x0 = (int16_t)lx;
+  if (y0) *y0 = (int16_t)ly;
+  if (x1) *x1 = (int16_t)rx;
+  if (y1) *y1 = (int16_t)ry;
+}
+
 void SpriteLayer::spriteBoundsPadded(const Sprite& s, int pad, int* x0, int* y0, int* x1, int* y1) {
   int left = 0;
   int top = 0;

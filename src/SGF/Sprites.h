@@ -65,6 +65,7 @@ public:
   Sprite& sprite(int index);
   Missile& missile(int index);
   static void spriteBounds(const Sprite& s, int* x0, int* y0, int* x1, int* y1);
+  static void spriteBounds(const Sprite& s, int16_t* x0, int16_t* y0, int16_t* x1, int16_t* y1);
   static void spriteBoundsPadded(const Sprite& s, int pad, int* x0, int* y0, int* x1, int* y1);
 
   void renderRegion(int x0, int y0, int w, int h, uint16_t* buf) const;
