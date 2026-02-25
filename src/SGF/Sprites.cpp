@@ -2,20 +2,45 @@
 
 namespace {
 
-bool doublesX(SpriteLayer::Scale scale) {
-  return scale == SpriteLayer::Scale::DoubleX || scale == SpriteLayer::Scale::Double;
+int scaleFactorX(SpriteLayer::Scale scale) {
+  switch (scale) {
+    case SpriteLayer::Scale::DoubleX:
+    case SpriteLayer::Scale::Double:
+      return 2;
+    case SpriteLayer::Scale::QuadX:
+    case SpriteLayer::Scale::Quad:
+      return 4;
+    case SpriteLayer::Scale::DoubleY:
+    case SpriteLayer::Scale::QuadY:
+    case SpriteLayer::Scale::Normal:
+    default:
+      return 1;
+  }
 }
 
-bool doublesY(SpriteLayer::Scale scale) {
-  return scale == SpriteLayer::Scale::DoubleY || scale == SpriteLayer::Scale::Double;
+int scaleFactorY(SpriteLayer::Scale scale) {
+  switch (scale) {
+    case SpriteLayer::Scale::DoubleX:
+    case SpriteLayer::Scale::QuadX:
+      return 1;
+    case SpriteLayer::Scale::DoubleY:
+    case SpriteLayer::Scale::Double:
+      return 2;
+    case SpriteLayer::Scale::QuadY:
+    case SpriteLayer::Scale::Quad:
+      return 4;
+    case SpriteLayer::Scale::Normal:
+    default:
+      return 1;
+  }
 }
 
 int scaledWidth(const SpriteLayer::Sprite& s) {
-  return doublesX(s.scale) ? (s.w * 2) : s.w;
+  return s.w * scaleFactorX(s.scale);
 }
 
 int scaledHeight(const SpriteLayer::Sprite& s) {
-  return doublesY(s.scale) ? (s.h * 2) : s.h;
+  return s.h * scaleFactorY(s.scale);
 }
 
 int anchorOffset(float anchor, int span) {
@@ -109,8 +134,10 @@ void SpriteLayer::renderRegion(int x0, int y0, int w, int h, uint16_t* buf) cons
     if (!m.active || m.h <= 0 || m.w <= 0) return;
     int mx0 = m.x;
     int my0 = m.y;
-    int scaledW = (doublesX(m.scale) ? (m.w * 2) : m.w);
-    int scaledH = (doublesY(m.scale) ? (m.h * 2) : m.h);
+    const int fx = scaleFactorX(m.scale);
+    const int fy = scaleFactorY(m.scale);
+    int scaledW = m.w * fx;
+    int scaledH = m.h * fy;
     int mx1 = m.x + scaledW - 1;
     int my1 = m.y + scaledH - 1;
     if (mx1 < x0 || mx0 >= x0 + w || my1 < y0 || my0 >= y0 + h) return;
@@ -123,7 +150,7 @@ void SpriteLayer::renderRegion(int x0, int y0, int w, int h, uint16_t* buf) cons
     for (int yy = ry0; yy <= ry1; ++yy) {
       for (int xx = rx0; xx <= rx1; ++xx) {
         int sx = xx - mx0;
-        if (doublesX(m.scale)) sx /= 2;
+        if (fx > 1) sx /= fx;
         if (sx < 0 || sx >= m.w) continue;
 
         int bufX = xx - x0;
@@ -135,6 +162,8 @@ void SpriteLayer::renderRegion(int x0, int y0, int w, int h, uint16_t* buf) cons
 
   auto blitSprite = [&](const Sprite& s) {
     if (!s.active || !s.pixels565 || s.w <= 0 || s.h <= 0) return;
+    const int fx = scaleFactorX(s.scale);
+    const int fy = scaleFactorY(s.scale);
     int sx0 = 0;
     int sy0 = 0;
     int sx1 = 0;
@@ -149,10 +178,10 @@ void SpriteLayer::renderRegion(int x0, int y0, int w, int h, uint16_t* buf) cons
 
     for (int yy = ry0; yy <= ry1; ++yy) {
       int srcY = yy - sy0;
-      if (doublesY(s.scale)) srcY /= 2;
+      if (fy > 1) srcY /= fy;
       for (int xx = rx0; xx <= rx1; ++xx) {
         int srcX = xx - sx0;
-        if (doublesX(s.scale)) srcX /= 2;
+        if (fx > 1) srcX /= fx;
         if (srcX < 0 || srcX >= s.w) continue;
 
         const uint16_t color = s.pixels565[srcY * s.w + srcX];

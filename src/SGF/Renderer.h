@@ -66,6 +66,7 @@ private:
   struct SpriteSnapshot {
     bool active = false;
     Rect bounds{0, 0, 0, 0};
+    uint32_t redrawRevision = 0;
   };
   std::array<SpriteSnapshot, SpriteLayer::kMaxSprites> spriteSnapshots_{};
 

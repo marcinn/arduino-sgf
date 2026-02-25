@@ -232,6 +232,7 @@ void Renderer::trackSpriteChanges() {
     const auto& s = sprites_.sprite(i);
     Rect cur{};
     const bool curActive = s.active;
+    const uint32_t curRedrawRevision = s.redrawRevision();
     if (curActive) {
       spriteBounds(s, &cur);
     }
@@ -241,6 +242,9 @@ void Renderer::trackSpriteChanges() {
     if (!changed && curActive) {
       changed = (snap.bounds.x0 != cur.x0) || (snap.bounds.y0 != cur.y0) ||
                 (snap.bounds.x1 != cur.x1) || (snap.bounds.y1 != cur.y1);
+    }
+    if (!changed && curActive) {
+      changed = (snap.redrawRevision != curRedrawRevision);
     }
 
     if (changed) {
@@ -253,6 +257,7 @@ void Renderer::trackSpriteChanges() {
     }
 
     snap.active = curActive;
+    snap.redrawRevision = curRedrawRevision;
     if (curActive) {
       snap.bounds = cur;
     }

@@ -13,6 +13,9 @@ public:
     DoubleX,
     DoubleY,
     Double,
+    QuadX,
+    QuadY,
+    Quad,
   };
 
   struct Sprite {
