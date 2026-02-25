@@ -57,9 +57,9 @@ void HardwareScroller::scroll(int delta,
 
     renderStrip(worldY, stripH, buf);
     if (blitStrip) {
-      blitStrip(yStripPhys, stripH, buf);
+      blitStrip((int)topFixed_ + yStripPhys, stripH, buf);
     } else {
-      gfx.blit565(0, yStripPhys, w, stripH, buf);
+      gfx.blit565(0, (int)topFixed_ + yStripPhys, w, stripH, buf);
     }
   };
 
