@@ -2,6 +2,27 @@
 
 #include <algorithm>
 
+namespace {
+
+// Blits a sub-rectangle of a row-major strip buffer by sending one display row
+// at a time. Used for landscape strip wrap, where the source split is by X and
+// the sub-rect columns are not contiguous in memory.
+static void blitStripSubRectRows(FastILI9341& gfx,
+                                 int dstX,
+                                 int dstY,
+                                 int w,
+                                 int h,
+                                 const uint16_t* src,
+                                 int srcStride,
+                                 int srcX) {
+  if (!src || w <= 0 || h <= 0) return;
+  for (int row = 0; row < h; ++row) {
+    gfx.blit565(dstX, dstY + row, w, 1, src + row * srcStride + srcX);
+  }
+}
+
+}  // namespace
+
 void HardwareScroller::configure(uint16_t topFixed, uint16_t scrollHeight, uint16_t bottomFixed) {
   topFixed_ = topFixed;
   scrollH_ = scrollHeight;
@@ -36,8 +57,11 @@ void HardwareScroller::scroll(int delta,
   const int cross = alongY ? gfx.width() : gfx.height();
 
   auto stepOnce = [&](int step) {
-    // Update VSCRSADD. Positive step advances the logical scroll offset.
-    int newOff = (int)offset_ + step;
+    // Update the raw VSCRSADD value. In mirrored-axis rotations the hardware
+    // scroll address must move in the opposite direction to keep API `delta`
+    // semantics stable in screen space.
+    const int hwStep = inverted ? -step : step;
+    int newOff = (int)offset_ + hwStep;
     while (newOff >= (int)scrollH_) newOff -= (int)scrollH_;
     while (newOff < 0) newOff += (int)scrollH_;
     offset_ = (uint16_t)newOff;
@@ -61,14 +85,29 @@ void HardwareScroller::scroll(int delta,
     if (blitStrip) {
       blitStrip(physPosOnScreen, stripSpan, buf);
     } else if (alongY) {
-      gfx.blit565(0, physPosOnScreen, cross, stripSpan, buf);
+      const int spanEnd = (int)topFixed_ + (int)scrollH_;
+      const int firstSpan = std::min(stripSpan, spanEnd - physPosOnScreen);
+      gfx.blit565(0, physPosOnScreen, cross, firstSpan, buf);
+      const int secondSpan = stripSpan - firstSpan;
+      if (secondSpan > 0) {
+        gfx.blit565(0, (int)topFixed_, cross, secondSpan, buf + cross * firstSpan);
+      }
     } else {
-      gfx.blit565(physPosOnScreen, 0, stripSpan, cross, buf);
+      const int spanEnd = (int)topFixed_ + (int)scrollH_;
+      const int firstSpan = std::min(stripSpan, spanEnd - physPosOnScreen);
+      const int secondSpan = stripSpan - firstSpan;
+      if (secondSpan <= 0) {
+        gfx.blit565(physPosOnScreen, 0, stripSpan, cross, buf);
+      } else {
+        blitStripSubRectRows(gfx, physPosOnScreen, 0, firstSpan, cross, buf, stripSpan, 0);
+        blitStripSubRectRows(gfx, (int)topFixed_, 0, secondSpan, cross, buf, stripSpan, firstSpan);
+      }
     }
   };
 
   while (remaining != 0) {
-    int step = std::clamp(remaining, -maxStripLines, maxStripLines);
+    const int stepLimit = std::min<int>(maxStripLines, scrollH_);
+    int step = std::clamp(remaining, -stepLimit, stepLimit);
     stepOnce(step);
     remaining -= step;
   }

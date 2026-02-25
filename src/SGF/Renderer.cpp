@@ -12,6 +12,22 @@ static void blitSubRectRows(FastILI9341& gfx,
                             const uint16_t* src,
                             int srcStride,
                             int srcX) {
+  if (w <= 0 || h <= 0 || !src) return;
+
+  // Fast path: the requested sub-rect is the full source region, so the pixel
+  // data is contiguous and can be sent in a single SPI transfer. This avoids
+  // row-by-row blits in the common landscape dirty-tile case and reduces
+  // visible tearing/smear artifacts.
+  if (srcX == 0 && srcStride == w) {
+    gfx.blit565(dstX, dstY, w, h, src);
+    return;
+  }
+
+  if (h == 1) {
+    gfx.blit565(dstX, dstY, w, 1, src + srcX);
+    return;
+  }
+
   for (int row = 0; row < h; ++row) {
     gfx.blit565(dstX, dstY + row, w, 1, src + row * srcStride + srcX);
   }
@@ -177,12 +193,17 @@ void Renderer::resetScrollAccumulator() {
 void Renderer::addSpriteGhosts(int delta) {
   if (delta == 0) return;
   const bool alongY = scroller_.scrollsAlongY();
-  const int screenShift = scroller_.axisInverted() ? delta : -delta;
+  const int screenShift = -delta;
+  constexpr int ghostPad = 1;  // defensive pad for edge pixels on wrapped hardware-scroll redraws
   for (int i = 0; i < SpriteLayer::kMaxSprites; ++i) {
     const auto& s = sprites_.sprite(i);
     if (!s.active) continue;
     Rect r;
     spriteBounds(s, &r);
+    r.x0 -= ghostPad;
+    r.y0 -= ghostPad;
+    r.x1 += ghostPad;
+    r.y1 += ghostPad;
     // Current on-screen position.
     dirty_.add(r.x0, r.y0, r.x1, r.y1);
     // Ghost left behind after the screen content shifts by `delta`.
@@ -195,6 +216,7 @@ void Renderer::addSpriteGhosts(int delta) {
       g.x1 += screenShift;
     }
     dirty_.add(g.x0, g.y0, g.x1, g.y1);
+
   }
 }
 
