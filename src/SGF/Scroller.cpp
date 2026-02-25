@@ -10,11 +10,15 @@ void HardwareScroller::configure(uint16_t topFixed, uint16_t scrollHeight, uint1
   resetOffset(0);
 }
 
+void HardwareScroller::configureFullScreen() {
+  configure(0, axisLength(), 0);
+}
+
 void HardwareScroller::resetOffset(uint16_t yOff) {
   if (scrollH_ == 0) return;
   offset_ = (uint16_t)(yOff % scrollH_);
-  gfx.scrollTo(offset_);
-  // worldTop_ liczymy tak, żeby 0 był początkiem strefy scrolla w czasie startu
+  gfx.scrollTo((uint16_t)(topFixed_ + offset_));
+  // Keep the logical offset aligned with the visible start of the scroll area.
   worldTop_ = (int32_t)offset_;
 }
 
@@ -25,41 +29,45 @@ void HardwareScroller::scroll(int delta,
                               const BlitStripFn& blitStrip) {
   if (!renderStrip || scrollH_ == 0 || maxStripLines <= 0) return;
 
-  // Rozbijamy delta na kroki |step|<=maxStripLines, żeby bufor wystarczył
+  // Split large deltas into chunks so the strip buffer always fits.
   int remaining = delta;
-  const int w = gfx.width();
+  const bool alongY = scrollsAlongY();
+  const int cross = alongY ? gfx.width() : gfx.height();
 
   auto stepOnce = [&](int step) {
-    // Aktualizacja offsetu (VSCRSADD): dodatni step = obraz w górę, odkryty pasek na dole
+    // Update VSCRSADD. Positive step advances the logical scroll offset.
     int newOff = (int)offset_ + step;
     while (newOff >= (int)scrollH_) newOff -= (int)scrollH_;
     while (newOff < 0) newOff += (int)scrollH_;
     offset_ = (uint16_t)newOff;
-    gfx.scrollTo(offset_);
+    gfx.scrollTo((uint16_t)(topFixed_ + offset_));
 
-    // worldTop_: logiczny Y pierwszej linii strefy scrolla
+    // Logical offset of the first visible unit in the scroll area.
     worldTop_ += step;
 
-    // Odkryty pasek: zależy od kierunku
-    int stripH = std::abs(step);
-    int yStripPhys;
+    // Newly exposed strip position in scroll-area coordinates.
+    const int stripSpan = std::abs(step);
+    int stripPhys = 0;
     if (step > 0) {
-      // Scroll w górę: odkryty pasek u dołu
-      yStripPhys = offset_ + scrollH_ - stripH;
-      if (yStripPhys >= scrollH_) yStripPhys -= scrollH_;
+      // Positive step reveals a strip at the end of the visible window.
+      stripPhys = offset_ + scrollH_ - stripSpan;
+      if (stripPhys >= (int)scrollH_) stripPhys -= (int)scrollH_;
     } else {
-      // Scroll w dół: odkryty pasek u góry (offset_ wskazuje nowy top)
-      yStripPhys = offset_;
+      // Negative step reveals a strip at the start (offset points to the new start).
+      stripPhys = offset_;
     }
 
-    // Współrzędna w świecie (do generowania terenu/levelu)
-    int32_t worldY = (step > 0) ? (worldTop_ + scrollH_ - stripH) : worldTop_;
+    // Logical coordinate of the exposed strip (for world generation).
+    const int32_t worldOffset = (step > 0) ? (worldTop_ + scrollH_ - stripSpan) : worldTop_;
+    const int physPosOnScreen = (int)topFixed_ + stripPhys;
 
-    renderStrip(worldY, stripH, buf);
+    renderStrip(worldOffset, stripSpan, buf);
     if (blitStrip) {
-      blitStrip((int)topFixed_ + yStripPhys, stripH, buf);
+      blitStrip(physPosOnScreen, stripSpan, buf);
+    } else if (alongY) {
+      gfx.blit565(0, physPosOnScreen, cross, stripSpan, buf);
     } else {
-      gfx.blit565(0, (int)topFixed_ + yStripPhys, w, stripH, buf);
+      gfx.blit565(physPosOnScreen, 0, stripSpan, cross, buf);
     }
   };
 

@@ -4,9 +4,22 @@
 
 namespace {
 
-// Maps logical screen Y to physical GRAM rows while hardware vertical scroll is active.
-// TileFlusher works in screen coordinates, so Renderer::flush uses this adapter to blit
-// dirty tiles into the correct RAM rows (including wrap inside the scroll region).
+static void blitSubRectRows(FastILI9341& gfx,
+                            int dstX,
+                            int dstY,
+                            int w,
+                            int h,
+                            const uint16_t* src,
+                            int srcStride,
+                            int srcX) {
+  for (int row = 0; row < h; ++row) {
+    gfx.blit565(dstX, dstY + row, w, 1, src + row * srcStride + srcX);
+  }
+}
+
+// Maps logical screen coordinates to physical GRAM positions while hardware
+// scroll is active. TileFlusher works in screen coordinates, so Renderer::flush
+// uses this adapter to write dirty tiles to the correct wrapped position.
 class ScrolledRenderTarget : public IRenderTarget {
 public:
   ScrolledRenderTarget(FastILI9341& gfx, const HardwareScroller& scroller)
@@ -18,42 +31,74 @@ public:
   void blit565(int x0, int y0, int w, int h, const uint16_t* pix) override {
     if (!pix || w <= 0 || h <= 0) return;
 
-    const int top = (int)scroller_.topFixed();
-    const int scrollH = (int)scroller_.scrollHeight();
-    if (scrollH <= 0) {
+    const int fixedStart = (int)scroller_.fixedStart();
+    const int scrollSpan = (int)scroller_.scrollSpan();
+    if (scrollSpan <= 0) {
       gfx_.blit565(x0, y0, w, h, pix);
       return;
     }
 
-    const int bottom = top + scrollH;
+    const int fixedEndStart = fixedStart + scrollSpan;
     const int offset = (int)scroller_.offset();
+    const bool alongY = scroller_.scrollsAlongY();
 
-    int row = 0;
-    while (row < h) {
-      const int sy = y0 + row;
+    if (alongY) {
+      int row = 0;
+      while (row < h) {
+        const int sy = y0 + row;
 
-      // Fixed areas are not remapped by hardware scroll.
-      if (sy < top) {
-        const int segH = std::min(h - row, top - sy);
-        gfx_.blit565(x0, sy, w, segH, pix + row * w);
+        // Fixed areas are not remapped by hardware scroll.
+        if (sy < fixedStart) {
+          const int segH = std::min(h - row, fixedStart - sy);
+          gfx_.blit565(x0, sy, w, segH, pix + row * w);
+          row += segH;
+          continue;
+        }
+        if (sy >= fixedEndStart) {
+          gfx_.blit565(x0, sy, w, h - row, pix + row * w);
+          return;
+        }
+
+        // Scroll area: split if the physical address wraps inside this tile.
+        const int localY = sy - fixedStart;
+        const int physLocalY = (offset + localY) % scrollSpan;
+        const int physY = fixedStart + physLocalY;
+        const int bySource = std::min(h - row, fixedEndStart - sy);
+        const int byWrap = scrollSpan - physLocalY;
+        const int segH = std::min(bySource, byWrap);
+
+        gfx_.blit565(x0, physY, w, segH, pix + row * w);
         row += segH;
+      }
+      return;
+    }
+
+    // Landscape path: the hardware scroll axis maps to screen X, so wrapping is
+    // horizontal. We split by columns and send row-sized chunks.
+    int col = 0;
+    while (col < w) {
+      const int sx = x0 + col;
+
+      if (sx < fixedStart) {
+        const int segW = std::min(w - col, fixedStart - sx);
+        blitSubRectRows(gfx_, sx, y0, segW, h, pix, w, col);
+        col += segW;
         continue;
       }
-      if (sy >= bottom) {
-        gfx_.blit565(x0, sy, w, h - row, pix + row * w);
+      if (sx >= fixedEndStart) {
+        blitSubRectRows(gfx_, sx, y0, w - col, h, pix, w, col);
         return;
       }
 
-      // Scroll area: split if the physical address wraps inside this tile.
-      const int localY = sy - top;
-      const int physLocalY = (offset + localY) % scrollH;
-      const int physY = top + physLocalY;
-      const int bySource = std::min(h - row, bottom - sy);
-      const int byWrap = scrollH - physLocalY;
-      const int segH = std::min(bySource, byWrap);
+      const int localX = sx - fixedStart;
+      const int physLocalX = (offset + localX) % scrollSpan;
+      const int physX = fixedStart + physLocalX;
+      const int bySource = std::min(w - col, fixedEndStart - sx);
+      const int byWrap = scrollSpan - physLocalX;
+      const int segW = std::min(bySource, byWrap);
 
-      gfx_.blit565(x0, physY, w, segH, pix + row * w);
-      row += segH;
+      blitSubRectRows(gfx_, physX, y0, segW, h, pix, w, col);
+      col += segW;
     }
   }
 
@@ -81,27 +126,28 @@ Renderer::Renderer(FastILI9341& gfx,
 void Renderer::scroll(int delta, uint16_t* stripBuf, int maxStripLines) {
   if (delta == 0) return;
 
-  // Rysujemy pasek odkryty przez hardware scroll.
+  // Render the strip exposed by the hardware scroll.
   scroller_.scroll(
     delta,
     stripBuf,
     maxStripLines,
-    [&](int32_t worldY, int h, uint16_t* buf) {
+    [&](int32_t worldOffset, int span, uint16_t* buf) {
       if (stripFn_) {
-        stripFn_(worldY, h, buf);
+        stripFn_(worldOffset, span, buf);
       } else if (bgFn_) {
-        // Render tła w pasku (pełna szerokość, worldY dostarczony).
-        bgFn_(0, 0, gfx_.width(), h, 0, worldY, buf);
+        // Fallback strip render via the main background callback.
+        if (scroller_.scrollsAlongY()) {
+          bgFn_(0, 0, gfx_.width(), span, 0, worldOffset, buf);
+        } else {
+          bgFn_(0, 0, span, gfx_.height(), worldOffset, 0, buf);
+        }
       } else {
-        // brak callbacku — wyczyść na czarno
-        std::fill(buf, buf + gfx_.width() * h, (uint16_t)0);
+        const int count = (scroller_.scrollsAlongY() ? (gfx_.width() * span) : (span * gfx_.height()));
+        std::fill(buf, buf + count, (uint16_t)0);
       }
-    },
-    [&](int physY, int h, uint16_t* buf) {
-      gfx_.blit565(0, physY, gfx_.width(), h, buf);
     });
 
-  // Dodajemy dirty na sprite'y, żeby nadpisać „duchy”.
+  // Mark sprite regions so ghosts left by hardware scroll get redrawn.
   addSpriteGhosts(delta);
 }
 
@@ -125,17 +171,23 @@ void Renderer::resetScrollAccumulator() {
 
 void Renderer::addSpriteGhosts(int delta) {
   if (delta == 0) return;
+  const bool alongY = scroller_.scrollsAlongY();
   for (int i = 0; i < SpriteLayer::kMaxSprites; ++i) {
     const auto& s = sprites_.sprite(i);
     if (!s.active) continue;
     Rect r;
     spriteBounds(s, &r);
-    // Aktualna pozycja
+    // Current on-screen position.
     dirty_.add(r.x0, r.y0, r.x1, r.y1);
-    // Ghost po hardware scrollu: ekran przesunął się o delta
+    // Ghost left behind after the screen content shifts by `delta`.
     Rect g = r;
-    g.y0 -= delta;
-    g.y1 -= delta;
+    if (alongY) {
+      g.y0 -= delta;
+      g.y1 -= delta;
+    } else {
+      g.x0 -= delta;
+      g.x1 -= delta;
+    }
     dirty_.add(g.x0, g.y0, g.x1, g.y1);
   }
 }
@@ -149,16 +201,16 @@ void Renderer::invalidate() {
   dirty_.invalidate(gfx_);
 }
 
-static int32_t worldYFromScreenY(const HardwareScroller& scroller, int y) {
-  uint16_t top = scroller.topFixed();
-  uint16_t scrollH = scroller.scrollHeight();
-  if (y < (int)top || scrollH == 0) {
-    return y;  // HUD / nieruchoma część
+static int32_t worldOffsetFromScreenCoord(const HardwareScroller& scroller, int pos) {
+  const uint16_t start = scroller.fixedStart();
+  const uint16_t span = scroller.scrollSpan();
+  if (pos < (int)start || span == 0) {
+    return pos;  // Fixed region before the scroll span.
   }
-  if (y >= (int)(top + scrollH)) {
-    return y;  // bottom fixed area
+  if (pos >= (int)(start + span)) {
+    return pos;  // Fixed region after the scroll span.
   }
-  return scroller.worldTop() + (y - (int)top);
+  return scroller.worldOffset() + (pos - (int)start);
 }
 
 void Renderer::flush(uint16_t* regionBuf) {
@@ -169,9 +221,15 @@ void Renderer::flush(uint16_t* regionBuf) {
     target,
     regionBuf,
     [&](int x0, int y0, int w, int h, uint16_t* buf) {
-      int32_t worldY = worldYFromScreenY(scroller_, y0);
+      int32_t worldX = x0;
+      int32_t worldY = y0;
+      if (scroller_.scrollsAlongY()) {
+        worldY = worldOffsetFromScreenCoord(scroller_, y0);
+      } else {
+        worldX = worldOffsetFromScreenCoord(scroller_, x0);
+      }
       if (bgFn_) {
-        bgFn_(x0, y0, w, h, x0, worldY, buf);
+        bgFn_(x0, y0, w, h, worldX, worldY, buf);
       } else {
         std::fill(buf, buf + w * h, (uint16_t)0);
       }

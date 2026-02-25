@@ -15,7 +15,7 @@ SGF is a lightweight C++ support library for small embedded games. It provides t
 - **FastILI9341**: Display driver for ILI9341 (blitting, backlight control, rotation).
 - **RectFlashAnim**: Utility for animating flashing rectangles, built on `DirtyRects`.
 - **Font5x7**: Fixed 5x7 bitmap font routines (width calculation, pixel sampling, drawing).
-- **HardwareScroller + Renderer**: Helper for hardware vertical scroll (ILI9341 VSCRDEF/VSCRSADD) and a thin façade that stitches scrolling, background redraw, sprites, and dirty-rect tile flushing together.
+- **HardwareScroller + Renderer**: Helper for 1D ILI9341 hardware scroll (VSCRDEF/VSCRSADD) plus a façade that stitches scrolling, background redraw, sprites, and dirty-rect tile flushing together. The active on-screen axis depends on rotation (portrait: vertical, landscape: horizontal).
 
 ## Typical use
 - Derive your game class from `Game`, override the three lifecycle hooks, and hold your state there.
@@ -205,26 +205,31 @@ uint16_t regionBuf[16 * 16];
 void setup() {
   gfx.begin(24000000);
   gfx.screenRotation(FastILI9341::Rotation::Landscape);
-  scroller.configure(0, gfx.height(), 0); // whole screen scrollable
+  scroller.configureFullScreen(); // full active scroll axis (portrait=Y, landscape=X)
 
   renderer.setBackgroundRenderer(
     [&](int x0,int y0,int w,int h,int32_t wx,int32_t wy,uint16_t* buf){
-      drawBackground(wx, wy, w, h, buf);   // worldY includes scroll offset
+      drawBackground(wx, wy, w, h, buf);   // active scroll axis is already mapped into wx/wy
     });
   renderer.setStripRenderer(
-    [&](int32_t wy,int h,uint16_t* buf){
-      drawBackground(0, wy, gfx.width(), h, buf); // new strip exposed by scroll
+    [&](int32_t worldOffset,int span,uint16_t* buf){
+      if (scroller.scrollsAlongY()) {
+        drawBackground(0, worldOffset, gfx.width(), span, buf);
+      } else {
+        drawBackground(worldOffset, 0, span, gfx.height(), buf);
+      }
     });
 }
 
-void loopFrame(int dy) { // dy>0 scrolls image up
-  renderer.scroll(dy, stripBuf, 16);      // hardware scroll + sprite ghost cleanup
+void loopFrame(int d) { // d>0 moves forward on the active scroll axis
+  renderer.scroll(d, stripBuf, 16);       // hardware scroll + sprite ghost cleanup
   updateSprites(sprites);                 // move sprites, call renderer.markSpriteMovement if needed
   renderer.flush(regionBuf);              // redraw only dirty tiles (background + sprites)
 }
 ```
 
 Key points:
-- `scroll` uses ILI9341 hardware VSCRDEF/VSCRSADD; only the newly exposed strip is drawn.
+- `scroll` uses ILI9341 VSCRDEF/VSCRSADD (single-axis hardware scroll); only the newly exposed strip is drawn.
+- Rotation defines the visible axis: portrait behaves like vertical scrolling, landscape behaves like horizontal scrolling.
 - Sprite ghosting is handled by marking sprite bounds before/after the scroll so they are redrawn in place.
 - `Renderer` combines background render, sprite overlay, and tile-based dirty flushing to minimize SPI traffic.

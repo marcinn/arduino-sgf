@@ -8,12 +8,13 @@
 #include "TileFlusher.h"
 #include "Scroller.h"
 
-// Renderer: fasada spinająca hardware scroll (ILI9341), tło i sprite'y.
-// Zakłada jedno źródło tła (callback) i jeden SpriteLayer.
+// Renderer facade that combines ILI9341 hardware scroll, background redraw,
+// sprite overlay, and dirty-tile flushing.
 class Renderer {
 public:
   using BackgroundFn = std::function<void(int x0, int y0, int w, int h, int32_t worldX0, int32_t worldY0, uint16_t* buf)>;
-  using StripFn      = std::function<void(int32_t worldY, int h, uint16_t* buf)>;
+  // `worldOffset`/`span` are on the active scroll axis (see HardwareScroller).
+  using StripFn      = std::function<void(int32_t worldOffset, int span, uint16_t* buf)>;
 
   Renderer(FastILI9341& gfx,
            HardwareScroller& scroller,
@@ -25,20 +26,21 @@ public:
   void setBackgroundRenderer(const BackgroundFn& fn) { bgFn_ = fn; }
   void setStripRenderer(const StripFn& fn) { stripFn_ = fn; }
 
-  // Scrolluje tło o delta pikseli; dodaje dirty dla sprite'ów (ghost cleanup).
+  // Scrolls the background by `delta` pixels on the active scroll axis and adds
+  // dirty rects to clean sprite ghosts caused by the hardware scroll.
   void scroll(int delta, uint16_t* stripBuf, int maxStripLines);
-  // Integruje prędkość (px/s) i dt (ms) do scrolla o całe piksele.
+  // Integrates velocity (px/s) and dt (ms) into whole-pixel scroll steps.
   void scrollByVelocity(int speedPxPerSec, uint32_t dtMs, uint16_t* stripBuf, int maxStripLines);
   void resetScrollAccumulator();
 
-  // Pomocniczo: zaznacz ruch sprite'a gdy przesuwasz go manualnie (stary i nowy rect).
+  // Marks sprite movement when sprite coordinates are updated manually.
   void markSpriteMovement(const Rect& oldRect, const Rect& newRect);
 
-  // Wymusza pełne odświeżenie.
+  // Forces a full-screen redraw on the next flush.
   void invalidate();
 
-  // Flushuje dirty recty: render tła -> sprite'y -> blit.
-  // regionBuf musi mieć tileW*tileH elementów.
+  // Flushes dirty rects: background render -> sprite overlay -> blit.
+  // `regionBuf` must contain at least tileW*tileH pixels.
   void flush(uint16_t* regionBuf);
 
 private:
@@ -51,7 +53,7 @@ private:
   StripFn stripFn_{};
   int tileW_;
   int tileH_;
-  int32_t scrollAccumMilliPx_ = 0;  // signed accumulator: px*ms/s (remainder in [-999,999])
+  int32_t scrollAccumMilliPx_ = 0;  // signed accumulator: px*ms/s remainder in [-999, 999]
 
   void addSpriteGhosts(int delta);
   static void spriteBounds(const SpriteLayer::Sprite& s, Rect* out);
