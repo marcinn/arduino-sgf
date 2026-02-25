@@ -105,6 +105,24 @@ void Renderer::scroll(int delta, uint16_t* stripBuf, int maxStripLines) {
   addSpriteGhosts(delta);
 }
 
+void Renderer::scrollByVelocity(int speedPxPerSec,
+                                uint32_t dtMs,
+                                uint16_t* stripBuf,
+                                int maxStripLines) {
+  if (dtMs == 0 || speedPxPerSec == 0) return;
+
+  scrollAccumMilliPx_ += (int32_t)speedPxPerSec * (int32_t)dtMs;
+  int delta = (int)(scrollAccumMilliPx_ / 1000);
+  scrollAccumMilliPx_ -= (int32_t)delta * 1000;
+  if (delta != 0) {
+    scroll(delta, stripBuf, maxStripLines);
+  }
+}
+
+void Renderer::resetScrollAccumulator() {
+  scrollAccumMilliPx_ = 0;
+}
+
 void Renderer::addSpriteGhosts(int delta) {
   if (delta == 0) return;
   for (int i = 0; i < SpriteLayer::kMaxSprites; ++i) {

@@ -27,6 +27,9 @@ public:
 
   // Scrolluje tło o delta pikseli; dodaje dirty dla sprite'ów (ghost cleanup).
   void scroll(int delta, uint16_t* stripBuf, int maxStripLines);
+  // Integruje prędkość (px/s) i dt (ms) do scrolla o całe piksele.
+  void scrollByVelocity(int speedPxPerSec, uint32_t dtMs, uint16_t* stripBuf, int maxStripLines);
+  void resetScrollAccumulator();
 
   // Pomocniczo: zaznacz ruch sprite'a gdy przesuwasz go manualnie (stary i nowy rect).
   void markSpriteMovement(const Rect& oldRect, const Rect& newRect);
@@ -48,6 +51,7 @@ private:
   StripFn stripFn_{};
   int tileW_;
   int tileH_;
+  int32_t scrollAccumMilliPx_ = 0;  // signed accumulator: px*ms/s (remainder in [-999,999])
 
   void addSpriteGhosts(int delta);
   static void spriteBounds(const SpriteLayer::Sprite& s, Rect* out);
