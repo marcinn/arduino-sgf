@@ -7,7 +7,7 @@ namespace {
 // Blits a sub-rectangle of a row-major strip buffer by sending one display row
 // at a time. Used for landscape strip wrap, where the source split is by X and
 // the sub-rect columns are not contiguous in memory.
-static void blitStripSubRectRows(FastILI9341& gfx,
+static void blitStripSubRectRows(IRenderTarget& target,
                                  int dstX,
                                  int dstY,
                                  int w,
@@ -17,7 +17,7 @@ static void blitStripSubRectRows(FastILI9341& gfx,
                                  int srcX) {
   if (!src || w <= 0 || h <= 0) return;
   for (int row = 0; row < h; ++row) {
-    gfx.blit565(dstX, dstY + row, w, 1, src + row * srcStride + srcX);
+    target.blit565(dstX, dstY + row, w, 1, src + row * srcStride + srcX);
   }
 }
 
@@ -27,7 +27,9 @@ void HardwareScroller::configure(uint16_t topFixed, uint16_t scrollHeight, uint1
   topFixed_ = topFixed;
   scrollH_ = scrollHeight;
   bottomFixed_ = bottomFixed;
-  gfx.setScrollArea(topFixed_, scrollH_, bottomFixed_);
+  if (hardwareEnabled_) {
+    target_.setScrollArea(topFixed_, scrollH_, bottomFixed_);
+  }
   resetOffset(0);
 }
 
@@ -38,7 +40,9 @@ void HardwareScroller::configureFullScreen() {
 void HardwareScroller::resetOffset(uint16_t yOff) {
   if (scrollH_ == 0) return;
   offset_ = (uint16_t)(yOff % scrollH_);
-  gfx.scrollTo((uint16_t)(topFixed_ + offset_));
+  if (hardwareEnabled_) {
+    target_.scrollTo((uint16_t)(topFixed_ + offset_));
+  }
   // Keep the logical offset aligned with the visible start of the scroll area.
   worldTop_ = (int32_t)offset_;
 }
@@ -48,13 +52,21 @@ void HardwareScroller::scroll(int delta,
                               int maxStripLines,
                               const RenderStripFn& renderStrip,
                               const BlitStripFn& blitStrip) {
-  if (!renderStrip || scrollH_ == 0 || maxStripLines <= 0) return;
+  if (scrollH_ == 0 || maxStripLines <= 0) return;
+
+  if (!hardwareEnabled_) {
+    worldTop_ += delta;
+    return;
+  }
+
+  if (!renderStrip) return;
 
   // Split large deltas into chunks so the strip buffer always fits.
   int remaining = delta;
   const bool alongY = scrollsAlongY();
+  const int cross = alongY ? target_.width() : target_.height();
+
   const bool inverted = axisInverted();
-  const int cross = alongY ? gfx.width() : gfx.height();
 
   auto stepOnce = [&](int step) {
     // Update the raw VSCRSADD value. In mirrored-axis rotations the hardware
@@ -65,7 +77,7 @@ void HardwareScroller::scroll(int delta,
     while (newOff >= (int)scrollH_) newOff -= (int)scrollH_;
     while (newOff < 0) newOff += (int)scrollH_;
     offset_ = (uint16_t)newOff;
-    gfx.scrollTo((uint16_t)(topFixed_ + offset_));
+    target_.scrollTo((uint16_t)(topFixed_ + offset_));
 
     // Logical offset of the first visible unit in the scroll area.
     worldTop_ += step;
@@ -87,20 +99,29 @@ void HardwareScroller::scroll(int delta,
     } else if (alongY) {
       const int spanEnd = (int)topFixed_ + (int)scrollH_;
       const int firstSpan = std::min(stripSpan, spanEnd - physPosOnScreen);
-      gfx.blit565(0, physPosOnScreen, cross, firstSpan, buf);
+      target_.blit565(0, physPosOnScreen, cross, firstSpan, buf);
       const int secondSpan = stripSpan - firstSpan;
       if (secondSpan > 0) {
-        gfx.blit565(0, (int)topFixed_, cross, secondSpan, buf + cross * firstSpan);
+        target_.blit565(0, (int)topFixed_, cross, secondSpan, buf + cross * firstSpan);
       }
     } else {
       const int spanEnd = (int)topFixed_ + (int)scrollH_;
       const int firstSpan = std::min(stripSpan, spanEnd - physPosOnScreen);
       const int secondSpan = stripSpan - firstSpan;
       if (secondSpan <= 0) {
-        gfx.blit565(physPosOnScreen, 0, stripSpan, cross, buf);
+        target_.blit565(physPosOnScreen, 0, stripSpan, cross, buf);
       } else {
-        blitStripSubRectRows(gfx, physPosOnScreen, 0, firstSpan, cross, buf, stripSpan, 0);
-        blitStripSubRectRows(gfx, (int)topFixed_, 0, secondSpan, cross, buf, stripSpan, firstSpan);
+        blitStripSubRectRows(target_, physPosOnScreen, 0, firstSpan, cross, buf, stripSpan, 0);
+        blitStripSubRectRows(
+          target_,
+          (int)topFixed_,
+          0,
+          secondSpan,
+          cross,
+          buf,
+          stripSpan,
+          firstSpan
+        );
       }
     }
   };

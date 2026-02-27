@@ -1,11 +1,12 @@
 #pragma once
 
-#include <stdint.h>
 #include <functional>
+#include <stdint.h>
 
-#include "FastILI9341.h"
+#include "IRenderTarget.h"
 
-// 1D hardware scroll helper for ILI9341 (VSCRDEF/VSCRSADD).
+// 1D hardware scroll helper for TFT controllers exposing a single hardware
+// scroll axis (for example VSCRDEF/VSCRSADD style controllers).
 // The visible on-screen axis depends on the current rotation:
 // - Portrait: scroll is along screen Y (up/down)
 // - Landscape: scroll is along screen X (left/right)
@@ -20,7 +21,8 @@ public:
   using RenderStripFn = std::function<void(int32_t worldOffset, int span, uint16_t* buf)>;
   using BlitStripFn   = std::function<void(int physPos, int span, uint16_t* buf)>;
 
-  explicit HardwareScroller(FastILI9341& gfx) : gfx(gfx) {}
+  explicit HardwareScroller(IRenderTarget& target)
+    : target_(target), hardwareEnabled_(target.supportsHardwareScroll()) {}
 
   // fixedStart + scrollSpan + fixedEnd must equal the active axis length
   // (Portrait: height(), Landscape: width()).
@@ -46,15 +48,20 @@ public:
               const RenderStripFn& renderStrip,
               const BlitStripFn& blitStrip = {});
 
-  bool scrollsAlongY() const { return gfx.height() >= gfx.width(); }
-  bool axisInverted() const { return gfx.scrollAxisInverted(); }
-  uint16_t axisLength() const { return (uint16_t)(scrollsAlongY() ? gfx.height() : gfx.width()); }
-  uint16_t crossLength() const { return (uint16_t)(scrollsAlongY() ? gfx.width() : gfx.height()); }
+  bool scrollsAlongY() const { return target_.height() >= target_.width(); }
+  bool axisInverted() const { return hardwareEnabled_ && target_.scrollAxisInverted(); }
+  uint16_t axisLength() const {
+    return (uint16_t)(scrollsAlongY() ? target_.height() : target_.width());
+  }
+  uint16_t crossLength() const {
+    return (uint16_t)(scrollsAlongY() ? target_.width() : target_.height());
+  }
 
   uint16_t fixedStart() const { return topFixed_; }
   uint16_t scrollSpan() const { return scrollH_; }
   uint16_t fixedEnd() const { return bottomFixed_; }
   int32_t worldOffset() const { return worldTop_; }
+  bool usesHardwareScroll() const { return hardwareEnabled_; }
 
   // Legacy aliases kept for compatibility with existing portrait-oriented code.
   uint16_t offset() const { return offset_; }
@@ -63,7 +70,8 @@ public:
   uint16_t scrollHeight() const { return scrollH_; }
 
 private:
-  FastILI9341& gfx;
+  IRenderTarget& target_;
+  bool hardwareEnabled_ = false;
   uint16_t topFixed_ = 0;     // fixed region at the start of the active axis
   uint16_t scrollH_ = 0;      // scroll span on the active axis
   uint16_t bottomFixed_ = 0;  // fixed region at the end of the active axis

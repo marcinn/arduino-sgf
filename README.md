@@ -13,26 +13,43 @@ SGF is a lightweight C++ support library for small embedded games. It provides t
 - **Collision**: Collision helpers, including circle-rectangle intersection.
 - **Color565**: RGB565 helpers (`Color565::rgb(...)`, `Color565::lighten(...)`, `Color565::darken(...)`, `Color565::bswap(...)`).
 - **FastILI9341**: Display driver for ILI9341 (blitting, backlight control, rotation).
+- **Platform bus adapters**: Keep hardware/platform-specific `IDisplayBus` implementations in separate libraries such as `SGF_ESP32` or `SGF_ArduinoQ`, then include them explicitly from the sketch.
 - **RectFlashAnim**: Utility for animating flashing rectangles, built on `DirtyRects`.
 - **Font5x7**: Fixed 5x7 bitmap font routines (width calculation, pixel sampling, drawing).
-- **HardwareScroller + Renderer**: Helper for 1D ILI9341 hardware scroll (VSCRDEF/VSCRSADD) plus a façade that stitches scrolling, background redraw, sprites, and dirty-rect tile flushing together. The active on-screen axis depends on rotation (portrait: vertical, landscape: horizontal).
+- **Renderer + built-in scroll helper**: `Renderer` owns the 1D scroll helper internally and stitches together optional hardware scroll, background redraw, sprites, and dirty-rect tile flushing. The active on-screen axis depends on rotation (portrait: vertical, landscape: horizontal).
 
 ## Typical use
 - Derive your game class from `Game`, override the three lifecycle hooks, and hold your state there.
 - For rendering, adapt your display to `IRenderTarget` (or use a thin adapter) and use `TileFlusher` with a game-provided region renderer to redraw dirty areas efficiently.
-- Leverage `DirtyRects` to mark updates, `Collision` for basic geometry tests, `Color565` for colors, and `FastILI9341` for display control when targeting that controller.
+- Leverage `DirtyRects` to mark updates, `Collision` for basic geometry tests, `Color565` for colors, and pair a display driver such as `FastILI9341` with a platform-specific bus adapter.
 
 ## Example: Game + Scene
 Below is a minimal example showing a game host with a title scene and a play scene. The title scene starts the game on `FIRE`, while the play scene moves a rectangle and redraws only dirty regions.
 
 ```cpp
 #include <Arduino.h>
+#include "SGF_ArduinoQ.h"
 #include "SGF/Actions.h"
 #include "SGF/Color565.h"
 #include "SGF/DirtyRects.h"
-#include "SGF/FastILI9341.h"
 #include "SGF/Game.h"
 #include "SGF/Scene.h"
+
+#define TFT_CS 10
+#define TFT_DC 9
+#define TFT_RST 8
+#define TFT_LED D6
+
+const SPIArduinoQDisplayBus::Config DISPLAY_BUS_CONFIG = {
+  DEVICE_DT_GET(DT_NODELABEL(spi2)),
+  TFT_CS,
+  TFT_DC,
+  TFT_RST,
+  TFT_LED
+};
+
+SPIArduinoQDisplayBus displayBus(DISPLAY_BUS_CONFIG);
+FastILI9341 gfx(displayBus);
 
 class MiniGame;
 
@@ -187,25 +204,31 @@ Notes:
 
 ## Example: Hardware scrolling with sprites (RiverRaid-style)
 ```cpp
-#include "SGF/FastILI9341.h"
-#include "SGF/Scroller.h"
+#include "SGF_ArduinoQ.h"
+#include "SGF/IRenderTarget.h"
 #include "SGF/Renderer.h"
 #include "SGF/Sprites.h"
 #include "SGF/DirtyRects.h"
 
-FastILI9341 gfx(CS, DC, RST, LED);
-HardwareScroller scroller(gfx);
+SPIArduinoQDisplayBus::Config displayBusConfig = {
+  DEVICE_DT_GET(DT_NODELABEL(spi2)),
+  TFT_CS,
+  TFT_DC,
+  TFT_RST,
+  TFT_LED
+};
+SPIArduinoQDisplayBus displayBus(displayBusConfig);
+FastILI9341 display(displayBus);
 SpriteLayer sprites;
 DirtyRects dirty;
-Renderer renderer(gfx, scroller, sprites, dirty, 16, 16);
+Renderer renderer(display, sprites, dirty, 16, 16);
 
 uint16_t stripBuf[320 * 16];
 uint16_t regionBuf[16 * 16];
 
 void setup() {
-  gfx.begin(24000000);
-  gfx.screenRotation(FastILI9341::Rotation::Landscape);
-  scroller.configureFullScreen(); // full active scroll axis (portrait=Y, landscape=X)
+  // Initialize your display driver and rotation before configuring scroll.
+  renderer.configureFullScreenScroll();
 
   renderer.setBackgroundRenderer(
     [&](int x0,int y0,int w,int h,int32_t wx,int32_t wy,uint16_t* buf){
@@ -221,10 +244,10 @@ void loopFrame(int d) { // d>0 moves forward on the active scroll axis
 ```
 
 Key points:
-- `scroll` uses ILI9341 VSCRDEF/VSCRSADD (single-axis hardware scroll); only the newly exposed strip is drawn.
+- `scroll` uses the controller hardware scroll path when the target supports it; otherwise `Renderer` falls back to a full invalidate.
 - Rotation defines the visible axis: portrait behaves like vertical scrolling, landscape behaves like horizontal scrolling.
 - `setStripRenderer(...)` is optional. Without it, `Renderer` renders the exposed strip via `BackgroundFn`.
-- If used, `StripFn` receives a `StripDesc` (axis + `w/h` + world origin) so the callback does not need to query `Scroller`.
+- If used, `StripFn` receives a `StripDesc` (axis + `w/h` + world origin) so the callback does not need direct access to a separate scroller object.
 - `Renderer::scroll(...)` marks sprite ghost regions caused by hardware scroll.
 - Sprite movement dirty rects are auto-tracked across `flush()` calls (`markSpriteMovement(...)` remains optional).
 - `Renderer` combines background render, sprite overlay, and tile-based dirty flushing to minimize SPI traffic.

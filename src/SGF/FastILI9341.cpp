@@ -1,30 +1,53 @@
 #include "FastILI9341.h"
+
 #include "SGF/Color565.h"
 #include "SGF/Font5x7.h"
 
-FastILI9341::FastILI9341(int cs, int dc, int rst, int led)
-  : PIN_CS(cs), PIN_DC(dc), PIN_RST(rst), PIN_LED(led) {}
+constexpr uint8_t FastILI9341::toMadctl(IScreen::Rotation rotation) {
+  switch (rotation) {
+    case IScreen::Rotation::Portrait:
+      return (uint8_t)ScreenRotation::Portrait;
+    case IScreen::Rotation::Landscape:
+      return (uint8_t)ScreenRotation::Landscape;
+    case IScreen::Rotation::PortraitFlip:
+      return (uint8_t)ScreenRotation::PortraitFlip;
+    case IScreen::Rotation::LandscapeFlip:
+    default:
+      return (uint8_t)ScreenRotation::LandscapeFlip;
+  }
+}
+
+constexpr IScreen::Rotation FastILI9341::toInterfaceRotation(uint8_t madctl) {
+  switch (madctl) {
+    case (uint8_t)ScreenRotation::Portrait:
+      return IScreen::Rotation::Portrait;
+    case (uint8_t)ScreenRotation::Landscape:
+      return IScreen::Rotation::Landscape;
+    case (uint8_t)ScreenRotation::PortraitFlip:
+      return IScreen::Rotation::PortraitFlip;
+    case (uint8_t)ScreenRotation::LandscapeFlip:
+    default:
+      return IScreen::Rotation::LandscapeFlip;
+  }
+}
+
+FastILI9341::FastILI9341(IDisplayBus& bus) : bus_(bus) {}
 
 void FastILI9341::setSPIFrequency(uint32_t spi_hz) {
-  spiCfg.frequency = spi_hz;
+  bus_.setFrequency(spi_hz);
 }
 
 void FastILI9341::setBacklight(uint8_t level) {
   backlightLevel = level;
-  if (PIN_LED < 0) return;
+  bus_.setBacklight(level);
+}
 
-  uint32_t pwm =
-    ((uint32_t)level * backlightPwmMaxValue + (BACKLIGHT_LEVEL_MAX / 2u)) / BACKLIGHT_LEVEL_MAX;
+void FastILI9341::setRotation(IScreen::Rotation rotation) {
+  screenRotation(toMadctl(rotation));
+}
 
-  if (pwm == 0u) {
-    digitalWrite(PIN_LED, LOW);
-    return;
-  }
-  if (pwm >= backlightPwmMaxValue) {
-    digitalWrite(PIN_LED, HIGH);
-    return;
-  }
-  analogWrite(PIN_LED, (int)pwm);
+IScreen::Rotation FastILI9341::rotation() const {
+  return toInterfaceRotation(rotationMadctl_);
 }
 
 void FastILI9341::fadeBacklightTo(uint8_t targetLevel, uint32_t durationMs) {
@@ -57,29 +80,18 @@ static inline uint16_t be16(uint16_t v) {
 }
 
 void FastILI9341::cmd(uint8_t c) {
-  digitalWrite(PIN_DC, LOW);
-  digitalWrite(PIN_CS, LOW);
-  spi_buf b{ .buf = (void*)&c, .len = 1 };
-  spi_buf_set s{ .buffers = &b, .count = 1 };
-  (void)spi_write(spiDev, &spiCfg, &s);
-  digitalWrite(PIN_CS, HIGH);
+  bus_.writeCommand(c);
 }
 
 void FastILI9341::data(const uint8_t* d, size_t n) {
-  digitalWrite(PIN_DC, HIGH);
-  digitalWrite(PIN_CS, LOW);
-  spi_buf b{ .buf = (void*)d, .len = (uint32_t)n };
-  spi_buf_set s{ .buffers = &b, .count = 1 };
-  (void)spi_write(spiDev, &spiCfg, &s);
-  digitalWrite(PIN_CS, HIGH);
+  bus_.writeData(d, n);
 }
 
 void FastILI9341::streamBegin() {
-  digitalWrite(PIN_DC, HIGH);
-  digitalWrite(PIN_CS, LOW);
+  bus_.beginDataWrite();
 }
 void FastILI9341::streamEnd() {
-  digitalWrite(PIN_CS, HIGH);
+  bus_.endDataWrite();
 }
 
 void FastILI9341::setWindow(int x0, int y0, int x1, int y1) {
@@ -109,13 +121,7 @@ void FastILI9341::scrollTo(uint16_t yOff) {
 }
 
 void FastILI9341::hwReset() {
-  if (PIN_RST < 0) return;
-  digitalWrite(PIN_RST, HIGH);
-  delay(5);
-  digitalWrite(PIN_RST, LOW);
-  delay(20);
-  digitalWrite(PIN_RST, HIGH);
-  delay(120);
+  bus_.hardwareReset();
 }
 
 void FastILI9341::screenRotation(uint8_t madctl) {
@@ -126,26 +132,8 @@ void FastILI9341::screenRotation(uint8_t madctl) {
 }
 
 bool FastILI9341::begin(uint32_t spi_hz, uint8_t madctl) {
-  pinMode(PIN_CS, OUTPUT);
-  pinMode(PIN_DC, OUTPUT);
-  if (PIN_RST >= 0) pinMode(PIN_RST, OUTPUT);
-  if (PIN_LED >= 0) {
-    pinMode(PIN_LED, OUTPUT);
-    setBacklight(BACKLIGHT_LEVEL_MAX);
-  }
-
-  digitalWrite(PIN_CS, HIGH);
-  digitalWrite(PIN_DC, HIGH);
-  if (PIN_RST >= 0) digitalWrite(PIN_RST, HIGH);
-
-  // UNO Q (Zephyr core): use spi2 as in the existing board setup.
-  spiDev = DEVICE_DT_GET(DT_NODELABEL(spi2));
-  if (!spiDev || !device_is_ready(spiDev)) return false;
-
-  spiCfg.frequency = spi_hz;
-  spiCfg.operation = SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB;
-  spiCfg.slave = 0;
-  spiCfg.cs = spi_cs_control{};
+  if (!bus_.begin(spi_hz)) return false;
+  setBacklight(BACKLIGHT_LEVEL_MAX);
 
   hwReset();
 
@@ -198,9 +186,7 @@ void FastILI9341::fillScreen565(uint16_t color565) {
     int h = (y + STRIP_H <= curH) ? STRIP_H : (curH - y);
     setWindow(0, y, curW - 1, y + h - 1);
     streamBegin();
-    spi_buf b{ .buf = strip, .len = (uint32_t)(curW * h * 2) };
-    spi_buf_set s{ .buffers = &b, .count = 1 };
-    (void)spi_write(spiDev, &spiCfg, &s);
+    bus_.writeDataChunk((const uint8_t*)strip, (size_t)(curW * h * 2));
     streamEnd();
   }
 }
@@ -267,8 +253,6 @@ void FastILI9341::blit565(int x0, int y0, int w, int h, const uint16_t* pix) {
 
   setWindow(x0, y0, x0 + w - 1, y0 + h - 1);
   streamBegin();
-  spi_buf b{ .buf = tmp, .len = (uint32_t)(n * 2) };
-  spi_buf_set s{ .buffers = &b, .count = 1 };
-  (void)spi_write(spiDev, &spiCfg, &s);
+  bus_.writeDataChunk((const uint8_t*)tmp, (size_t)(n * 2));
   streamEnd();
 }

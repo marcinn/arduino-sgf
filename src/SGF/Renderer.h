@@ -5,11 +5,12 @@
 #include <stdint.h>
 
 #include "DirtyRects.h"
+#include "IRenderTarget.h"
 #include "Sprites.h"
 #include "TileFlusher.h"
 #include "Scroller.h"
 
-// Renderer facade that combines ILI9341 hardware scroll, background redraw,
+// Renderer facade that combines hardware scroll, background redraw,
 // sprite overlay, and dirty-tile flushing.
 class Renderer {
 public:
@@ -24,8 +25,7 @@ public:
   };
   using StripFn = std::function<void(const StripDesc& strip, uint16_t* buf)>;
 
-  Renderer(FastILI9341& gfx,
-           HardwareScroller& scroller,
+  Renderer(IRenderTarget& target,
            SpriteLayer& sprites,
            DirtyRects& dirty,
            int tileW,
@@ -40,6 +40,9 @@ public:
   // Integrates velocity (px/s) and dt (ms) into whole-pixel scroll steps.
   void scrollByVelocity(int speedPxPerSec, uint32_t dtMs, uint16_t* stripBuf, int maxStripLines);
   void resetScrollAccumulator();
+  void configureScroll(uint16_t fixedStart, uint16_t scrollSpan, uint16_t fixedEnd);
+  void configureFullScreenScroll();
+  void resetScrollOffset(uint16_t offset = 0);
 
   // Optional manual dirty mark for callers that want explicit control.
   // Renderer also auto-tracks sprite bounds across flushes.
@@ -53,8 +56,8 @@ public:
   void flush(uint16_t* regionBuf);
 
 private:
-  FastILI9341& gfx_;
-  HardwareScroller& scroller_;
+  IRenderTarget& target_;
+  HardwareScroller scroller_;
   SpriteLayer& sprites_;
   DirtyRects& dirty_;
   TileFlusher flusher_;

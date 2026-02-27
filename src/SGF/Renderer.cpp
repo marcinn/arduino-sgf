@@ -4,7 +4,7 @@
 
 namespace {
 
-static void blitSubRectRows(FastILI9341& gfx,
+static void blitSubRectRows(IRenderTarget& target,
                             int dstX,
                             int dstY,
                             int w,
@@ -16,17 +16,17 @@ static void blitSubRectRows(FastILI9341& gfx,
 
   // Use a single transfer when the requested sub-rect is contiguous.
   if (srcX == 0 && srcStride == w) {
-    gfx.blit565(dstX, dstY, w, h, src);
+    target.blit565(dstX, dstY, w, h, src);
     return;
   }
 
   if (h == 1) {
-    gfx.blit565(dstX, dstY, w, 1, src + srcX);
+    target.blit565(dstX, dstY, w, 1, src + srcX);
     return;
   }
 
   for (int row = 0; row < h; ++row) {
-    gfx.blit565(dstX, dstY + row, w, 1, src + row * srcStride + srcX);
+    target.blit565(dstX, dstY + row, w, 1, src + row * srcStride + srcX);
   }
 }
 
@@ -35,19 +35,19 @@ static void blitSubRectRows(FastILI9341& gfx,
 // uses this adapter to write dirty tiles to the correct wrapped position.
 class ScrolledRenderTarget : public IRenderTarget {
 public:
-  ScrolledRenderTarget(FastILI9341& gfx, const HardwareScroller& scroller)
-    : gfx_(gfx), scroller_(scroller) {}
+  ScrolledRenderTarget(IRenderTarget& target, const HardwareScroller& scroller)
+    : target_(target), scroller_(scroller) {}
 
-  int width() const override { return gfx_.width(); }
-  int height() const override { return gfx_.height(); }
+  int width() const override { return target_.width(); }
+  int height() const override { return target_.height(); }
 
   void blit565(int x0, int y0, int w, int h, const uint16_t* pix) override {
     if (!pix || w <= 0 || h <= 0) return;
 
     const int fixedStart = (int)scroller_.fixedStart();
     const int scrollSpan = (int)scroller_.scrollSpan();
-    if (scrollSpan <= 0) {
-      gfx_.blit565(x0, y0, w, h, pix);
+    if (!scroller_.usesHardwareScroll() || scrollSpan <= 0) {
+      target_.blit565(x0, y0, w, h, pix);
       return;
     }
 
@@ -64,12 +64,12 @@ public:
         // Fixed areas are not remapped by hardware scroll.
         if (sy < fixedStart) {
           const int segH = std::min(h - row, fixedStart - sy);
-          gfx_.blit565(x0, sy, w, segH, pix + row * w);
+          target_.blit565(x0, sy, w, segH, pix + row * w);
           row += segH;
           continue;
         }
         if (sy >= fixedEndStart) {
-          gfx_.blit565(x0, sy, w, h - row, pix + row * w);
+          target_.blit565(x0, sy, w, h - row, pix + row * w);
           return;
         }
 
@@ -83,7 +83,7 @@ public:
         const int byWrap = scrollSpan - physLocalY;
         const int segH = std::min(bySource, byWrap);
 
-        gfx_.blit565(x0, physY, w, segH, pix + row * w);
+        target_.blit565(x0, physY, w, segH, pix + row * w);
         row += segH;
       }
       return;
@@ -97,12 +97,12 @@ public:
 
       if (sx < fixedStart) {
         const int segW = std::min(w - col, fixedStart - sx);
-        blitSubRectRows(gfx_, sx, y0, segW, h, pix, w, col);
+        blitSubRectRows(target_, sx, y0, segW, h, pix, w, col);
         col += segW;
         continue;
       }
       if (sx >= fixedEndStart) {
-        blitSubRectRows(gfx_, sx, y0, w - col, h, pix, w, col);
+        blitSubRectRows(target_, sx, y0, w - col, h, pix, w, col);
         return;
       }
 
@@ -115,34 +115,51 @@ public:
       const int byWrap = scrollSpan - physLocalX;
       const int segW = std::min(bySource, byWrap);
 
-      blitSubRectRows(gfx_, physX, y0, segW, h, pix, w, col);
+      blitSubRectRows(target_, physX, y0, segW, h, pix, w, col);
       col += segW;
     }
   }
 
 private:
-  FastILI9341& gfx_;
+  IRenderTarget& target_;
   const HardwareScroller& scroller_;
 };
 
 }  // namespace
 
-Renderer::Renderer(FastILI9341& gfx,
-                   HardwareScroller& scroller,
+Renderer::Renderer(IRenderTarget& target,
                    SpriteLayer& sprites,
                    DirtyRects& dirty,
                    int tileW,
                    int tileH)
-  : gfx_(gfx),
-    scroller_(scroller),
+  : target_(target),
+    scroller_(target),
     sprites_(sprites),
     dirty_(dirty),
     flusher_(dirty, tileW, tileH),
     tileW_(tileW),
     tileH_(tileH) {}
 
+void Renderer::configureScroll(uint16_t fixedStart, uint16_t scrollSpan, uint16_t fixedEnd) {
+  scroller_.configure(fixedStart, scrollSpan, fixedEnd);
+}
+
+void Renderer::configureFullScreenScroll() {
+  scroller_.configureFullScreen();
+}
+
+void Renderer::resetScrollOffset(uint16_t offset) {
+  scroller_.resetOffset(offset);
+}
+
 void Renderer::scroll(int delta, uint16_t* stripBuf, int maxStripLines) {
   if (delta == 0) return;
+
+  if (!scroller_.usesHardwareScroll()) {
+    scroller_.scroll(delta, stripBuf, maxStripLines, {});
+    dirty_.invalidate(target_);
+    return;
+  }
 
   // Render the strip exposed by the hardware scroll.
   scroller_.scroll(
@@ -154,13 +171,13 @@ void Renderer::scroll(int delta, uint16_t* stripBuf, int maxStripLines) {
       strip.alongY = scroller_.scrollsAlongY();
       strip.span = span;
       if (strip.alongY) {
-        strip.w = gfx_.width();
+        strip.w = target_.width();
         strip.h = span;
         strip.worldX0 = 0;
         strip.worldY0 = worldOffset;
       } else {
         strip.w = span;
-        strip.h = gfx_.height();
+        strip.h = target_.height();
         strip.worldX0 = worldOffset;
         strip.worldY0 = 0;
       }
@@ -270,7 +287,7 @@ void Renderer::markSpriteMovement(const Rect& oldRect, const Rect& newRect) {
 }
 
 void Renderer::invalidate() {
-  dirty_.invalidate(gfx_);
+  dirty_.invalidate(target_);
 }
 
 static int32_t worldOffsetFromScreenCoord(const HardwareScroller& scroller, int pos) {
@@ -290,7 +307,7 @@ void Renderer::flush(uint16_t* regionBuf) {
 
   trackSpriteChanges();
 
-  ScrolledRenderTarget target(gfx_, scroller_);
+  ScrolledRenderTarget target(target_, scroller_);
   flusher_.flush(
     target,
     regionBuf,
