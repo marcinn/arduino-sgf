@@ -8,6 +8,7 @@ public:
   virtual int width() const = 0;
   virtual int height() const = 0;
   virtual void blit565(int x0, int y0, int w, int h, const uint16_t* pix) = 0;
+  virtual void tickEffects() {}
   virtual bool supportsHardwareScroll() const { return false; }
   virtual void setScrollArea(uint16_t fixedStart, uint16_t scrollSpan, uint16_t fixedEnd) {
     (void)fixedStart;

@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 
+#include "BacklightFade.h"
 #include "IDisplayBus.h"
 #include "IRenderTarget.h"
 #include "IScreen.h"
@@ -80,6 +81,7 @@ public:
   void fadeBacklightTo(uint8_t targetLevel, uint32_t durationMs);
   void fadeInBacklight(uint32_t durationMs) { fadeBacklightTo(BACKLIGHT_LEVEL_MAX, durationMs); }
   void fadeOutBacklight(uint32_t durationMs) { fadeBacklightTo(BACKLIGHT_LEVEL_MIN, durationMs); }
+  void tickEffects() override;
 
   int width() const override { return curW; }
   int height() const override { return curH; }
@@ -87,7 +89,6 @@ public:
   void fillScreen565(uint16_t color565) override;
   void fillRect565(int x0, int y0, int w, int h, uint16_t color565) override;
   void drawText(int x, int y, const char* text, int scale, uint16_t color565);
-  void drawCenteredText(int y, const char* text, int scale, uint16_t color565);
   void blit565(int x0, int y0, int w, int h, const uint16_t* pix) override;
   void setScrollArea(uint16_t topFixed, uint16_t scrollHeight, uint16_t bottomFixed) override;
   void scrollTo(uint16_t yOffset) override;
@@ -99,10 +100,13 @@ private:
   int curH = 0;
   uint8_t backlightLevel = BACKLIGHT_LEVEL_MAX;
   ScreenRotation currentRotation_ = ScreenRotation::Landscape;
+  BacklightFade backlightFade;
 
   static constexpr uint8_t st7789Madctl(ScreenRotation rotation);
   static constexpr ScreenRotation toScreenRotation(IScreen::Rotation rotation);
   static constexpr IScreen::Rotation toInterfaceRotation(ScreenRotation rotation);
+  void applyBacklightLevel(uint8_t level);
+  void updateBacklightFade();
   void updateDimensions();
   Offset currentOffset() const;
   void hwReset();

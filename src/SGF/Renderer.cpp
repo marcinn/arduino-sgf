@@ -303,6 +303,7 @@ static int32_t worldOffsetFromScreenCoord(const HardwareScroller& scroller, int 
 }
 
 void Renderer::flush(uint16_t* regionBuf) {
+  target_.tickEffects();
   if (!regionBuf) return;
 
   trackSpriteChanges();

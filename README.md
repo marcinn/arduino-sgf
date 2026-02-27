@@ -15,7 +15,8 @@ SGF is a lightweight C++ support library for small embedded games. It provides t
 - **FastILI9341**: Display driver for ILI9341 (blitting, backlight control, rotation).
 - **Platform bus adapters**: Keep hardware/platform-specific `IDisplayBus` implementations in separate libraries such as `SGF_ESP32` or `SGF_ArduinoQ`, then include them explicitly from the sketch.
 - **RectFlashAnim**: Utility for animating flashing rectangles, built on `DirtyRects`.
-- **Font5x7**: Fixed 5x7 bitmap font routines (width calculation, pixel sampling, drawing).
+- **Font5x7**: Fixed 5x7 bitmap font routines (width calculation, pixel sampling, drawing through plain or context-aware fill callbacks).
+- **TextBlock**: Small text primitive that owns its content/style, marks `DirtyRects` on changes, and renders through SGF font callbacks.
 - **Renderer + built-in scroll helper**: `Renderer` owns the 1D scroll helper internally and stitches together optional hardware scroll, background redraw, sprites, and dirty-rect tile flushing. The active on-screen axis depends on rotation (portrait: vertical, landscape: horizontal).
 
 ## Typical use

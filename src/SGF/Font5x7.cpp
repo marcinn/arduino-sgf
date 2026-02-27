@@ -2,6 +2,19 @@
 
 namespace Font5x7 {
 
+namespace {
+
+struct FillRectAdapterCtx {
+  FillRectFn fillRect;
+};
+
+void fillRectAdapter(void* ctx, int x, int y, int w, int h, uint16_t color565) {
+  FillRectAdapterCtx& adapter = *static_cast<FillRectAdapterCtx*>(ctx);
+  adapter.fillRect(x, y, w, h, color565);
+}
+
+}  // namespace
+
 static const uint8_t* glyph(char ch) {
   static const uint8_t GLYPH_SPACE[7] = {0,0,0,0,0,0,0};
   static const uint8_t GLYPH_BALL[7]  = {0x00,0x0E,0x1F,0x1F,0x1F,0x0E,0x00};
@@ -114,7 +127,21 @@ bool textPixel(const char* s, int scale, int x, int y) {
 }
 
 void drawText(int x, int y, const char* s, int scale, uint16_t color565, FillRectFn fillRect) {
-  if (!s || !fillRect || scale <= 0) return;
+  FillRectAdapterCtx adapter{fillRect};
+  drawText(x, y, s, scale, color565, &adapter, fillRectAdapter);
+}
+
+void drawText(
+  int x,
+  int y,
+  const char* s,
+  int scale,
+  uint16_t color565,
+  void* ctx,
+  FillRectCtxFn fillRect) {
+  if (!s || !fillRect || scale <= 0) {
+    return;
+  }
 
   const int advance = 5 * scale + scale;
   int cx = x;
@@ -124,7 +151,7 @@ void drawText(int x, int y, const char* s, int scale, uint16_t color565, FillRec
       uint8_t bits = g[row];
       for (int col = 0; col < 5; col++) {
         if (bits & (1u << (4 - col))) {
-          fillRect(cx + col * scale, y + row * scale, scale, scale, color565);
+          fillRect(ctx, cx + col * scale, y + row * scale, scale, scale, color565);
         }
       }
     }
@@ -132,9 +159,21 @@ void drawText(int x, int y, const char* s, int scale, uint16_t color565, FillRec
 }
 
 void drawCenteredText(int screenW, int y, const char* s, int scale, uint16_t color565, FillRectFn fillRect) {
+  FillRectAdapterCtx adapter{fillRect};
+  drawCenteredText(screenW, y, s, scale, color565, &adapter, fillRectAdapter);
+}
+
+void drawCenteredText(
+  int screenW,
+  int y,
+  const char* s,
+  int scale,
+  uint16_t color565,
+  void* ctx,
+  FillRectCtxFn fillRect) {
   int w = textWidth(s, scale);
   int x = (screenW - w) / 2;
-  drawText(x, y, s, scale, color565, fillRect);
+  drawText(x, y, s, scale, color565, ctx, fillRect);
 }
 
 }  // namespace Font5x7

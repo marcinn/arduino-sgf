@@ -9,6 +9,10 @@ uint16_t be16(uint16_t value) {
   return (uint16_t)((value << 8) | (value >> 8));
 }
 
+void fillRectForFont(void* ctx, int x, int y, int w, int h, uint16_t color565) {
+  static_cast<FastST7789*>(ctx)->fillRect565(x, y, w, h, color565);
+}
+
 }  // namespace
 
 constexpr uint8_t FastST7789::st7789Madctl(ScreenRotation rotation) {
@@ -40,9 +44,14 @@ void FastST7789::setSPIFrequency(uint32_t spi_hz) {
   bus_.setFrequency(spi_hz);
 }
 
-void FastST7789::setBacklight(uint8_t level) {
+void FastST7789::applyBacklightLevel(uint8_t level) {
   backlightLevel = level;
   bus_.setBacklight(level);
+}
+
+void FastST7789::setBacklight(uint8_t level) {
+  backlightFade.stop();
+  applyBacklightLevel(level);
 }
 
 void FastST7789::fadeBacklightTo(uint8_t targetLevel, uint32_t durationMs) {
@@ -52,21 +61,26 @@ void FastST7789::fadeBacklightTo(uint8_t targetLevel, uint32_t durationMs) {
     return;
   }
 
-  uint32_t t0 = millis();
-  while (true) {
-    uint32_t elapsed = millis() - t0;
-    if (elapsed >= durationMs) {
-      break;
-    }
+  backlightFade.start(startLevel, targetLevel, millis(), durationMs);
+}
 
-    int32_t delta = (int32_t)targetLevel - (int32_t)startLevel;
-    uint8_t current =
-      (uint8_t)((int32_t)startLevel + (delta * (int32_t)elapsed) / (int32_t)durationMs);
-    setBacklight(current);
-    delay(1);
+void FastST7789::tickEffects() {
+  updateBacklightFade();
+}
+
+void FastST7789::updateBacklightFade() {
+  if (!backlightFade.active) {
+    return;
   }
 
-  setBacklight(targetLevel);
+  uint32_t now = millis();
+  if (backlightFade.isComplete(now)) {
+    applyBacklightLevel(backlightFade.targetLevel);
+    backlightFade.stop();
+    return;
+  }
+
+  applyBacklightLevel(backlightFade.levelAt(now));
 }
 
 bool FastST7789::begin(uint32_t spi_hz) {
@@ -286,27 +300,7 @@ void FastST7789::fillRect565(int x0, int y0, int w, int h, uint16_t color565) {
 }
 
 void FastST7789::drawText(int x, int y, const char* text, int scale, uint16_t color565) {
-  if (!text || scale <= 0) {
-    return;
-  }
-
-  const int width = Font5x7::textWidth(text, scale);
-  const int height = 7 * scale;
-  for (int yy = 0; yy < height; yy++) {
-    for (int xx = 0; xx < width; xx++) {
-      if (Font5x7::textPixel(text, scale, xx, yy)) {
-        fillRect565(x + xx, y + yy, 1, 1, color565);
-      }
-    }
-  }
-}
-
-void FastST7789::drawCenteredText(int y, const char* text, int scale, uint16_t color565) {
-  if (!text) {
-    return;
-  }
-  int x = (width() - Font5x7::textWidth(text, scale)) / 2;
-  drawText(x, y, text, scale, color565);
+  Font5x7::drawText(x, y, text, scale, color565, this, fillRectForFont);
 }
 
 void FastST7789::blit565(int x0, int y0, int w, int h, const uint16_t* pix) {

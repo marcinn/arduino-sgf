@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 
+#include "BacklightFade.h"
 #include "IDisplayBus.h"
 #include "IRenderTarget.h"
 #include "IScreen.h"
@@ -42,6 +43,7 @@ public:
   void fadeBacklightTo(uint8_t targetLevel, uint32_t durationMs);
   void fadeInBacklight(uint32_t durationMs) { fadeBacklightTo(BACKLIGHT_LEVEL_MAX, durationMs); }
   void fadeOutBacklight(uint32_t durationMs) { fadeBacklightTo(BACKLIGHT_LEVEL_MIN, durationMs); }
+  void tickEffects() override;
 
   int width() const override { return curW; }
   int height() const override { return curH; }
@@ -49,7 +51,6 @@ public:
   void fillScreen565(uint16_t color565) override;  // Color in native RGB565 (not byte-swapped).
   void fillRect565(int x0, int y0, int w, int h, uint16_t color565) override;
   void drawText(int x, int y, const char* text, int scale, uint16_t color565);
-  void drawCenteredText(int y, const char* text, int scale, uint16_t color565);
 
   // Blit a row-major RGB565 buffer (native-endian) into a rectangle.
   void blit565(int x0, int y0, int w, int h, const uint16_t* pix) override;
@@ -69,9 +70,12 @@ private:
 
   uint8_t backlightLevel = BACKLIGHT_LEVEL_MAX;
   uint8_t rotationMadctl_ = (uint8_t)ScreenRotation::Landscape;
+  BacklightFade backlightFade;
 
   static constexpr uint8_t toMadctl(IScreen::Rotation rotation);
   static constexpr IScreen::Rotation toInterfaceRotation(uint8_t madctl);
+  void applyBacklightLevel(uint8_t level);
+  void updateBacklightFade();
   void updateDimensions(uint8_t madctl);
   void hwReset();
   void cmd(uint8_t c);

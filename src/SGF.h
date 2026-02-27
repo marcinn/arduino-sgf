@@ -19,4 +19,5 @@
 #include "SGF/InputPin.h"
 #include "SGF/Scene.h"
 #include "SGF/Font5x7.h"
+#include "SGF/TextBlock.h"
 #include "SGF/Collision.h"
