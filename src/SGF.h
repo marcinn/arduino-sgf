@@ -13,6 +13,8 @@
 #include "SGF/IScreen.h"
 #include "SGF/Vector2.h"
 #include "SGF/Character.h"
+#include "SGF/RigidBody.h"
+#include "SGF/Physics.h"
 #include "SGF/SpriteCharacter.h"
 #include "SGF/Game.h"
 #include "SGF/Actions.h"
