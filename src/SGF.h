@@ -11,6 +11,7 @@
 #include "SGF/IDisplayBus.h"
 #include "SGF/IRenderTarget.h"
 #include "SGF/IScreen.h"
+#include "SGF/HardwareProfile.h"
 #include "SGF/Math.h"
 #include "SGF/Vector2.h"
 #include "SGF/Character.h"
