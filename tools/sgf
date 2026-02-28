@@ -286,12 +286,38 @@ resolve_board_value() {
   esac
 }
 
+resolve_env_extra_flags() {
+  local name
+  local value
+  local extra_flags=''
+
+  while IFS='=' read -r name value; do
+    case "$name" in
+      ENABLE_[A-Z0-9_]*)
+        if [ -z "$value" ]; then
+          value=1
+        fi
+        extra_flags="$extra_flags -D$name=$value"
+        ;;
+    esac
+  done < <(env)
+
+  extra_flags="$(trim "$extra_flags")"
+  printf '%s' "$extra_flags"
+}
+
 resolve_build_extra_flags() {
   local preset="$1"
   local extra_flags='-DSGF_HW_PRESET='"$preset"
+  local env_extra_flags
 
   if [ -n "$PROJECT_EXTRA_FLAGS" ]; then
     extra_flags="$extra_flags $PROJECT_EXTRA_FLAGS"
+  fi
+
+  env_extra_flags="$(resolve_env_extra_flags)"
+  if [ -n "$env_extra_flags" ]; then
+    extra_flags="$extra_flags $env_extra_flags"
   fi
 
   printf '%s' "$extra_flags"

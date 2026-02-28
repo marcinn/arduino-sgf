@@ -90,6 +90,12 @@ sgf info
 sgf clean board=esp32
 ```
 
+Exported `ENABLE_*` variables are forwarded as preprocessor defines. Example:
+
+```bash
+ENABLE_CTRL4B=1 sgf flash board=esp32 port=/dev/ttyUSB0
+```
+
 If `arduino-cli` is bundled inside Arduino IDE and not available in `PATH`, pass the IDE root:
 
 ```bash
