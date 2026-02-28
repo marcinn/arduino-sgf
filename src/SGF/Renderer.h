@@ -6,9 +6,9 @@
 
 #include "DirtyRects.h"
 #include "IRenderTarget.h"
+#include "Scroller.h"
 #include "Sprites.h"
 #include "TileFlusher.h"
-#include "Scroller.h"
 
 // Renderer facade that combines hardware scroll, background redraw,
 // sprite overlay, and dirty-tile flushing.
@@ -31,8 +31,8 @@ public:
            int tileW,
            int tileH);
 
-  void setBackgroundRenderer(const BackgroundFn& fn) { bgFn_ = fn; }
-  void setStripRenderer(const StripFn& fn) { stripFn_ = fn; }
+  void setBackgroundRenderer(const BackgroundFn& fn) { bgFn = fn; }
+  void setStripRenderer(const StripFn& fn) { stripFn = fn; }
 
   // Scrolls the background by `delta` pixels on the active scroll axis and adds
   // dirty rects to clean sprite ghosts caused by the hardware scroll.
@@ -56,22 +56,22 @@ public:
   void flush(uint16_t* regionBuf);
 
 private:
-  IRenderTarget& target_;
-  HardwareScroller scroller_;
-  SpriteLayer& sprites_;
-  DirtyRects& dirty_;
-  TileFlusher flusher_;
-  BackgroundFn bgFn_{};
-  StripFn stripFn_{};
-  int tileW_;
-  int tileH_;
-  int32_t scrollAccumMilliPx_ = 0;  // signed accumulator: px*ms/s remainder in [-999, 999]
+  IRenderTarget& target;
+  HardwareScroller scroller;
+  SpriteLayer& sprites;
+  DirtyRects& dirty;
+  TileFlusher flusher;
+  BackgroundFn bgFn{};
+  StripFn stripFn{};
+  int tileW;
+  int tileH;
+  int32_t scrollAccumMilliPx = 0;  // signed accumulator: px*ms/s remainder in [-999, 999]
   struct SpriteSnapshot {
     bool active = false;
     Rect bounds{0, 0, 0, 0};
     uint32_t redrawRevision = 0;
   };
-  std::array<SpriteSnapshot, SpriteLayer::kMaxSprites> spriteSnapshots_{};
+  std::array<SpriteSnapshot, SpriteLayer::kMaxSprites> spriteSnapshots{};
 
   void addSpriteGhosts(int delta);
   void trackSpriteChanges();

@@ -2,7 +2,9 @@
 
 #include <algorithm>
 
-void TileFlusher::flush(IRenderTarget& target, uint16_t* regionBuf, const RenderRegionFn& renderRegion) {
+void TileFlusher::flush(IRenderTarget& target,
+                        uint16_t* regionBuf,
+                        const RenderRegionFn& renderRegion) {
   if (!renderRegion) return;
 
   dirty.clip(target.width(), target.height());

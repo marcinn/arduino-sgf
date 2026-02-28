@@ -36,25 +36,25 @@ static void blitSubRectRows(IRenderTarget& target,
 class ScrolledRenderTarget : public IRenderTarget {
 public:
   ScrolledRenderTarget(IRenderTarget& target, const HardwareScroller& scroller)
-    : target_(target), scroller_(scroller) {}
+    : target(target), scroller(scroller) {}
 
-  int width() const override { return target_.width(); }
-  int height() const override { return target_.height(); }
+  int width() const override { return target.width(); }
+  int height() const override { return target.height(); }
 
   void blit565(int x0, int y0, int w, int h, const uint16_t* pix) override {
     if (!pix || w <= 0 || h <= 0) return;
 
-    const int fixedStart = (int)scroller_.fixedStart();
-    const int scrollSpan = (int)scroller_.scrollSpan();
-    if (!scroller_.usesHardwareScroll() || scrollSpan <= 0) {
-      target_.blit565(x0, y0, w, h, pix);
+    const int fixedStart = (int)scroller.fixedStart();
+    const int scrollSpan = (int)scroller.scrollSpan();
+    if (!scroller.usesHardwareScroll() || scrollSpan <= 0) {
+      target.blit565(x0, y0, w, h, pix);
       return;
     }
 
     const int fixedEndStart = fixedStart + scrollSpan;
-    const int offset = (int)scroller_.offset();
-    const bool alongY = scroller_.scrollsAlongY();
-    const bool inverted = scroller_.axisInverted();
+    const int offset = (int)scroller.offset();
+    const bool alongY = scroller.scrollsAlongY();
+    const bool inverted = scroller.axisInverted();
 
     if (alongY) {
       int row = 0;
@@ -64,12 +64,12 @@ public:
         // Fixed areas are not remapped by hardware scroll.
         if (sy < fixedStart) {
           const int segH = std::min(h - row, fixedStart - sy);
-          target_.blit565(x0, sy, w, segH, pix + row * w);
+          target.blit565(x0, sy, w, segH, pix + row * w);
           row += segH;
           continue;
         }
         if (sy >= fixedEndStart) {
-          target_.blit565(x0, sy, w, h - row, pix + row * w);
+          target.blit565(x0, sy, w, h - row, pix + row * w);
           return;
         }
 
@@ -83,7 +83,7 @@ public:
         const int byWrap = scrollSpan - physLocalY;
         const int segH = std::min(bySource, byWrap);
 
-        target_.blit565(x0, physY, w, segH, pix + row * w);
+        target.blit565(x0, physY, w, segH, pix + row * w);
         row += segH;
       }
       return;
@@ -97,12 +97,12 @@ public:
 
       if (sx < fixedStart) {
         const int segW = std::min(w - col, fixedStart - sx);
-        blitSubRectRows(target_, sx, y0, segW, h, pix, w, col);
+        blitSubRectRows(target, sx, y0, segW, h, pix, w, col);
         col += segW;
         continue;
       }
       if (sx >= fixedEndStart) {
-        blitSubRectRows(target_, sx, y0, w - col, h, pix, w, col);
+        blitSubRectRows(target, sx, y0, w - col, h, pix, w, col);
         return;
       }
 
@@ -115,14 +115,14 @@ public:
       const int byWrap = scrollSpan - physLocalX;
       const int segW = std::min(bySource, byWrap);
 
-      blitSubRectRows(target_, physX, y0, segW, h, pix, w, col);
+      blitSubRectRows(target, physX, y0, segW, h, pix, w, col);
       col += segW;
     }
   }
 
 private:
-  IRenderTarget& target_;
-  const HardwareScroller& scroller_;
+  IRenderTarget& target;
+  const HardwareScroller& scroller;
 };
 
 }  // namespace
@@ -132,61 +132,61 @@ Renderer::Renderer(IRenderTarget& target,
                    DirtyRects& dirty,
                    int tileW,
                    int tileH)
-  : target_(target),
-    scroller_(target),
-    sprites_(sprites),
-    dirty_(dirty),
-    flusher_(dirty, tileW, tileH),
-    tileW_(tileW),
-    tileH_(tileH) {}
+  : target(target),
+    scroller(target),
+    sprites(sprites),
+    dirty(dirty),
+    flusher(dirty, tileW, tileH),
+    tileW(tileW),
+    tileH(tileH) {}
 
 void Renderer::configureScroll(uint16_t fixedStart, uint16_t scrollSpan, uint16_t fixedEnd) {
-  scroller_.configure(fixedStart, scrollSpan, fixedEnd);
+  scroller.configure(fixedStart, scrollSpan, fixedEnd);
 }
 
 void Renderer::configureFullScreenScroll() {
-  scroller_.configureFullScreen();
+  scroller.configureFullScreen();
 }
 
 void Renderer::resetScrollOffset(uint16_t offset) {
-  scroller_.resetOffset(offset);
+  scroller.resetOffset(offset);
 }
 
 void Renderer::scroll(int delta, uint16_t* stripBuf, int maxStripLines) {
   if (delta == 0) return;
 
-  if (!scroller_.usesHardwareScroll()) {
-    scroller_.scroll(delta, stripBuf, maxStripLines, {});
-    dirty_.invalidate(target_);
+  if (!scroller.usesHardwareScroll()) {
+    scroller.scroll(delta, stripBuf, maxStripLines, {});
+    dirty.invalidate(target);
     return;
   }
 
   // Render the strip exposed by the hardware scroll.
-  scroller_.scroll(
+  scroller.scroll(
     delta,
     stripBuf,
     maxStripLines,
     [&](int32_t worldOffset, int span, uint16_t* buf) {
       Renderer::StripDesc strip{};
-      strip.alongY = scroller_.scrollsAlongY();
+      strip.alongY = scroller.scrollsAlongY();
       strip.span = span;
       if (strip.alongY) {
-        strip.w = target_.width();
+        strip.w = target.width();
         strip.h = span;
         strip.worldX0 = 0;
         strip.worldY0 = worldOffset;
       } else {
         strip.w = span;
-        strip.h = target_.height();
+        strip.h = target.height();
         strip.worldX0 = worldOffset;
         strip.worldY0 = 0;
       }
 
-      if (stripFn_) {
-        stripFn_(strip, buf);
-      } else if (bgFn_) {
+      if (stripFn) {
+        stripFn(strip, buf);
+      } else if (bgFn) {
         // Fallback strip render via the main background callback.
-        bgFn_(0, 0, strip.w, strip.h, strip.worldX0, strip.worldY0, buf);
+        bgFn(0, 0, strip.w, strip.h, strip.worldX0, strip.worldY0, buf);
       } else {
         const int count = strip.w * strip.h;
         std::fill(buf, buf + count, (uint16_t)0);
@@ -203,25 +203,25 @@ void Renderer::scrollByVelocity(int speedPxPerSec,
                                 int maxStripLines) {
   if (dtMs == 0 || speedPxPerSec == 0) return;
 
-  scrollAccumMilliPx_ += (int32_t)speedPxPerSec * (int32_t)dtMs;
-  int delta = (int)(scrollAccumMilliPx_ / 1000);
-  scrollAccumMilliPx_ -= (int32_t)delta * 1000;
+  scrollAccumMilliPx += (int32_t)speedPxPerSec * (int32_t)dtMs;
+  int delta = (int)(scrollAccumMilliPx / 1000);
+  scrollAccumMilliPx -= (int32_t)delta * 1000;
   if (delta != 0) {
     scroll(delta, stripBuf, maxStripLines);
   }
 }
 
 void Renderer::resetScrollAccumulator() {
-  scrollAccumMilliPx_ = 0;
+  scrollAccumMilliPx = 0;
 }
 
 void Renderer::addSpriteGhosts(int delta) {
   if (delta == 0) return;
-  const bool alongY = scroller_.scrollsAlongY();
+  const bool alongY = scroller.scrollsAlongY();
   const int screenShift = -delta;
   constexpr int ghostPad = 1;  // Covers edge pixels at tile/sprite boundaries.
   for (int i = 0; i < SpriteLayer::kMaxSprites; ++i) {
-    const auto& s = sprites_.sprite(i);
+    const auto& s = sprites.sprite(i);
     if (!s.active) continue;
     Rect r;
     spriteBounds(s, &r);
@@ -230,7 +230,7 @@ void Renderer::addSpriteGhosts(int delta) {
     r.x1 += ghostPad;
     r.y1 += ghostPad;
     // Current on-screen position.
-    dirty_.add(r.x0, r.y0, r.x1, r.y1);
+    dirty.add(r.x0, r.y0, r.x1, r.y1);
     // Ghost left behind after the screen content shifts by `delta`.
     Rect g = r;
     if (alongY) {
@@ -240,13 +240,13 @@ void Renderer::addSpriteGhosts(int delta) {
       g.x0 += screenShift;
       g.x1 += screenShift;
     }
-    dirty_.add(g.x0, g.y0, g.x1, g.y1);
+    dirty.add(g.x0, g.y0, g.x1, g.y1);
   }
 }
 
 void Renderer::trackSpriteChanges() {
   for (int i = 0; i < SpriteLayer::kMaxSprites; ++i) {
-    const auto& s = sprites_.sprite(i);
+    const auto& s = sprites.sprite(i);
     Rect cur{};
     const bool curActive = s.active;
     const uint32_t curRedrawRevision = s.redrawRevision();
@@ -254,7 +254,7 @@ void Renderer::trackSpriteChanges() {
       spriteBounds(s, &cur);
     }
 
-    auto& snap = spriteSnapshots_[i];
+    auto& snap = spriteSnapshots[i];
     bool changed = (snap.active != curActive);
     if (!changed && curActive) {
       changed = (snap.bounds.x0 != cur.x0) || (snap.bounds.y0 != cur.y0) ||
@@ -266,10 +266,10 @@ void Renderer::trackSpriteChanges() {
 
     if (changed) {
       if (snap.active) {
-        dirty_.add(snap.bounds.x0, snap.bounds.y0, snap.bounds.x1, snap.bounds.y1);
+        dirty.add(snap.bounds.x0, snap.bounds.y0, snap.bounds.x1, snap.bounds.y1);
       }
       if (curActive) {
-        dirty_.add(cur.x0, cur.y0, cur.x1, cur.y1);
+        dirty.add(cur.x0, cur.y0, cur.x1, cur.y1);
       }
     }
 
@@ -282,12 +282,12 @@ void Renderer::trackSpriteChanges() {
 }
 
 void Renderer::markSpriteMovement(const Rect& oldRect, const Rect& newRect) {
-  dirty_.add(oldRect.x0, oldRect.y0, oldRect.x1, oldRect.y1);
-  dirty_.add(newRect.x0, newRect.y0, newRect.x1, newRect.y1);
+  dirty.add(oldRect.x0, oldRect.y0, oldRect.x1, oldRect.y1);
+  dirty.add(newRect.x0, newRect.y0, newRect.x1, newRect.y1);
 }
 
 void Renderer::invalidate() {
-  dirty_.invalidate(target_);
+  dirty.invalidate(target);
 }
 
 static int32_t worldOffsetFromScreenCoord(const HardwareScroller& scroller, int pos) {
@@ -303,29 +303,29 @@ static int32_t worldOffsetFromScreenCoord(const HardwareScroller& scroller, int 
 }
 
 void Renderer::flush(uint16_t* regionBuf) {
-  target_.tickEffects();
+  target.tickEffects();
   if (!regionBuf) return;
 
   trackSpriteChanges();
 
-  ScrolledRenderTarget target(target_, scroller_);
-  flusher_.flush(
-    target,
+  ScrolledRenderTarget bgTarget(target, scroller);
+  flusher.flush(
+    bgTarget,
     regionBuf,
     [&](int x0, int y0, int w, int h, uint16_t* buf) {
       int32_t worldX = x0;
       int32_t worldY = y0;
-      if (scroller_.scrollsAlongY()) {
-        worldY = worldOffsetFromScreenCoord(scroller_, y0);
+      if (scroller.scrollsAlongY()) {
+        worldY = worldOffsetFromScreenCoord(scroller, y0);
       } else {
-        worldX = worldOffsetFromScreenCoord(scroller_, x0);
+        worldX = worldOffsetFromScreenCoord(scroller, x0);
       }
-      if (bgFn_) {
-        bgFn_(x0, y0, w, h, worldX, worldY, buf);
+      if (bgFn) {
+        bgFn(x0, y0, w, h, worldX, worldY, buf);
       } else {
         std::fill(buf, buf + w * h, (uint16_t)0);
       }
-      sprites_.renderRegion(x0, y0, w, h, buf);
+      sprites.renderRegion(x0, y0, w, h, buf);
     });
 }
 
