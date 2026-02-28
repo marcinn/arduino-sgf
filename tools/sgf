@@ -1,0 +1,763 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+SCRIPT_NAME="$(basename "$0")"
+
+SUPPORTED_BOARDS=(unoq esp32)
+
+die() {
+  printf 'sgf: %s\n' "$*" >&2
+  exit 1
+}
+
+trim() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
+usage() {
+  cat <<EOF
+Usage:
+  $SCRIPT_NAME init [target_dir] [--name PROJECT_NAME] [--force]
+  $SCRIPT_NAME build [board=NAME] [port=/dev/ttyXXX] [monitor_config=115200] [arduino_ide=/path]
+  $SCRIPT_NAME flash [board=NAME] [port=/dev/ttyXXX] [arduino_ide=/path]
+  $SCRIPT_NAME upload [board=NAME] [port=/dev/ttyXXX] [arduino_ide=/path]
+  $SCRIPT_NAME monitor [board=NAME] [port=/dev/ttyXXX] [monitor_config=115200] [arduino_ide=/path]
+  $SCRIPT_NAME boards
+  $SCRIPT_NAME info [board=NAME] [arduino_ide=/path]
+  $SCRIPT_NAME clean [board=NAME]
+
+Metadata lives in the sketch entrypoint as comment lines:
+  // sgf.name: MyGame
+  // sgf.boards: unoq, esp32
+  // sgf.default_board: unoq
+  // sgf.port.unoq: /dev/ttyACM0
+  // sgf.port.esp32: /dev/ttyUSB0
+
+Optional local Arduino libraries:
+  ./libraries/SGF
+  ./libraries/sgf-hardware-presets
+
+Examples:
+  $SCRIPT_NAME init .
+  $SCRIPT_NAME build board=esp32
+  $SCRIPT_NAME build arduino_ide=/opt/arduino-ide board=esp32
+  $SCRIPT_NAME flash board=esp32 port=/dev/ttyUSB0
+EOF
+}
+
+sanitize_class_name() {
+  local input="$1"
+  local part
+  local out=""
+
+  while IFS= read -r part; do
+    [ -n "$part" ] || continue
+    out+="${part^}"
+  done < <(printf '%s' "$input" | tr -cs '[:alnum:]' '\n')
+
+  if [ -z "$out" ]; then
+    out="App"
+  fi
+
+  if [[ "$out" =~ ^[0-9] ]]; then
+    out="App$out"
+  fi
+
+  printf '%s' "$out"
+}
+
+board_default_fqbn() {
+  case "$1" in
+    unoq) printf '%s' 'arduino:zephyr:unoq' ;;
+    esp32) printf '%s' 'esp32:esp32:esp32' ;;
+    *) die "unsupported board '$1'. Supported values: ${SUPPORTED_BOARDS[*]}" ;;
+  esac
+}
+
+board_default_options() {
+  case "$1" in
+    unoq) printf '%s' 'link_mode=dynamic,flash_mode=flash,wait_linux_boot=yes' ;;
+    esp32) printf '%s' 'UploadSpeed=921600,CPUFreq=240,FlashFreq=80,FlashMode=qio,FlashSize=4M,PartitionScheme=default,DebugLevel=none,PSRAM=disabled,LoopCore=1,EventsCore=1,EraseFlash=none,JTAGAdapter=default,ZigbeeMode=default' ;;
+    *) die "unsupported board '$1'. Supported values: ${SUPPORTED_BOARDS[*]}" ;;
+  esac
+}
+
+board_default_preset() {
+  case "$1" in
+    unoq) printf '%s' 'SGF_HW_PRESET_UNOQ_ILI9341_320X240' ;;
+    esp32) printf '%s' 'SGF_HW_PRESET_ESP32_ST7789_240X240' ;;
+    *) die "unsupported board '$1'. Supported values: ${SUPPORTED_BOARDS[*]}" ;;
+  esac
+}
+
+board_default_port() {
+  case "$1" in
+    unoq) printf '%s' '/dev/ttyACM0' ;;
+    esp32) printf '%s' '/dev/ttyUSB0' ;;
+    *) die "unsupported board '$1'. Supported values: ${SUPPORTED_BOARDS[*]}" ;;
+  esac
+}
+
+metadata_get() {
+  local file="$1"
+  local key="$2"
+  local value
+
+  value="$(
+    awk -v key="$key" '
+      {
+        if (match($0, /^[[:space:]]*\/\/[[:space:]]*sgf\.([[:alnum:]_.-]+)[[:space:]]*:[[:space:]]*(.*)$/, matchData)) {
+          if (matchData[1] == key) {
+            print matchData[2]
+            exit
+          }
+        }
+      }
+    ' "$file"
+  )"
+
+  value="$(trim "$value")"
+  [ -n "$value" ] || return 1
+  printf '%s' "$value"
+}
+
+split_csv() {
+  local csv="$1"
+  local item
+  local old_ifs="$IFS"
+  IFS=','
+  for item in $csv; do
+    item="$(trim "$item")"
+    [ -n "$item" ] && printf '%s\n' "$item"
+  done
+  IFS="$old_ifs"
+}
+
+find_arduino_cli() {
+  local cli
+  local candidate
+  local ide_dir="${CLI_ARDUINO_IDE:-}"
+
+  if [ -n "$ide_dir" ]; then
+    candidate="$ide_dir/resources/app/lib/backend/resources/arduino-cli"
+    [ -x "$candidate" ] || die "arduino-cli not found under arduino-ide path: $ide_dir"
+    printf '%s' "$candidate"
+    return
+  fi
+
+  cli="$(command -v arduino-cli 2>/dev/null || true)"
+  if [ -n "$cli" ]; then
+    printf '%s' "$cli"
+    return
+  fi
+
+  for candidate in \
+    /opt/arduino-ide/resources/app/lib/backend/resources/arduino-cli \
+    /usr/local/bin/arduino-cli \
+    /usr/bin/arduino-cli; do
+    if [ -x "$candidate" ]; then
+      printf '%s' "$candidate"
+      return
+    fi
+  done
+
+  die "arduino-cli not found; set PATH or pass --arduino-ide /path/to/arduino-ide"
+}
+
+discover_entrypoint() {
+  local dir_basename
+  local file
+  local annotated=()
+  local inos=()
+
+  shopt -s nullglob
+  for file in *.ino; do
+    inos+=("$file")
+  done
+  shopt -u nullglob
+
+  [ "${#inos[@]}" -gt 0 ] || die "no .ino entrypoint found in $(pwd)"
+
+  if [ "${#inos[@]}" -eq 1 ]; then
+    printf '%s' "${inos[0]}"
+    return
+  fi
+
+  dir_basename="$(basename "$PWD").ino"
+  if [ -f "$dir_basename" ]; then
+    printf '%s' "$dir_basename"
+    return
+  fi
+
+  for file in "${inos[@]}"; do
+    if metadata_get "$file" 'name' >/dev/null 2>&1; then
+      annotated+=("$file")
+    fi
+  done
+
+  if [ "${#annotated[@]}" -eq 1 ]; then
+    printf '%s' "${annotated[0]}"
+    return
+  fi
+
+  die "multiple .ino files found; keep one entrypoint or name one $(basename "$PWD").ino"
+}
+
+array_contains() {
+  local needle="$1"
+  shift
+  local item
+
+  for item in "$@"; do
+    if [ "$item" = "$needle" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+ENTRYPOINT=''
+SKETCH_NAME=''
+DEFAULT_BOARD=''
+PROJECT_BOARDS=()
+PROJECT_EXTRA_FLAGS=''
+PROJECT_MONITOR_CONFIG=''
+
+load_project_context() {
+  local configured_name
+  local default_board
+
+  if [ -n "$ENTRYPOINT" ]; then
+    return
+  fi
+
+  ENTRYPOINT="$(discover_entrypoint)"
+  configured_name="$(metadata_get "$ENTRYPOINT" 'name' || true)"
+  if [ -n "$configured_name" ]; then
+    SKETCH_NAME="$configured_name"
+  else
+    SKETCH_NAME="${ENTRYPOINT%.ino}"
+  fi
+
+  if metadata_get "$ENTRYPOINT" 'boards' >/dev/null 2>&1; then
+    mapfile -t PROJECT_BOARDS < <(split_csv "$(metadata_get "$ENTRYPOINT" 'boards')")
+  else
+    PROJECT_BOARDS=("${SUPPORTED_BOARDS[@]}")
+  fi
+
+  [ "${#PROJECT_BOARDS[@]}" -gt 0 ] || die "no boards configured in $ENTRYPOINT"
+
+  default_board="$(metadata_get "$ENTRYPOINT" 'default_board' || true)"
+  if [ -n "$default_board" ]; then
+    DEFAULT_BOARD="$default_board"
+  else
+    DEFAULT_BOARD="${PROJECT_BOARDS[0]}"
+  fi
+
+  array_contains "$DEFAULT_BOARD" "${PROJECT_BOARDS[@]}" || \
+    die "default board '$DEFAULT_BOARD' is not listed in sgf.boards"
+
+  PROJECT_EXTRA_FLAGS="$(metadata_get "$ENTRYPOINT" 'extra_flags' || true)"
+  PROJECT_MONITOR_CONFIG="$(metadata_get "$ENTRYPOINT" 'monitor_config' || true)"
+}
+
+resolve_board_value() {
+  local entrypoint="$1"
+  local board="$2"
+  local key="$3"
+  local value
+
+  value="$(metadata_get "$entrypoint" "$key.$board" || true)"
+  if [ -n "$value" ]; then
+    printf '%s' "$value"
+    return
+  fi
+
+  case "$key" in
+    fqbn) board_default_fqbn "$board" ;;
+    options) board_default_options "$board" ;;
+    preset) board_default_preset "$board" ;;
+    port) board_default_port "$board" ;;
+    *) die "unsupported board metadata key '$key'" ;;
+  esac
+}
+
+resolve_build_extra_flags() {
+  local preset="$1"
+  local extra_flags='-DSGF_HW_PRESET='"$preset"
+
+  if [ -n "$PROJECT_EXTRA_FLAGS" ]; then
+    extra_flags="$extra_flags $PROJECT_EXTRA_FLAGS"
+  fi
+
+  printf '%s' "$extra_flags"
+}
+
+CLI_BOARD=''
+CLI_PORT=''
+CLI_MONITOR_CONFIG=''
+CLI_ARDUINO_IDE=''
+CLI_ARGS=()
+
+parse_runtime_args() {
+  CLI_BOARD=''
+  CLI_PORT=''
+  CLI_MONITOR_CONFIG=''
+  CLI_ARDUINO_IDE=''
+  CLI_ARGS=()
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      board=*)
+        CLI_BOARD="${1#board=}"
+        ;;
+      port=*)
+        CLI_PORT="${1#port=}"
+        ;;
+      monitor_config=*)
+        CLI_MONITOR_CONFIG="${1#monitor_config=}"
+        ;;
+      arduino_ide=*)
+        CLI_ARDUINO_IDE="${1#arduino_ide=}"
+        ;;
+      --board)
+        [ "$#" -ge 2 ] || die "--board requires a value"
+        CLI_BOARD="$2"
+        shift
+        ;;
+      --port)
+        [ "$#" -ge 2 ] || die "--port requires a value"
+        CLI_PORT="$2"
+        shift
+        ;;
+      --monitor-config)
+        [ "$#" -ge 2 ] || die "--monitor-config requires a value"
+        CLI_MONITOR_CONFIG="$2"
+        shift
+        ;;
+      --arduino-ide)
+        [ "$#" -ge 2 ] || die "--arduino-ide requires a value"
+        CLI_ARDUINO_IDE="$2"
+        shift
+        ;;
+      *)
+        CLI_ARGS+=("$1")
+        ;;
+    esac
+    shift
+  done
+}
+
+resolve_selected_board() {
+  load_project_context
+  if [ -n "$CLI_BOARD" ]; then
+    array_contains "$CLI_BOARD" "${PROJECT_BOARDS[@]}" || \
+      die "board '$CLI_BOARD' is not enabled for this project. Available: ${PROJECT_BOARDS[*]}"
+    printf '%s' "$CLI_BOARD"
+    return
+  fi
+  printf '%s' "$DEFAULT_BOARD"
+}
+
+resolve_selected_port() {
+  local board="$1"
+  if [ -n "$CLI_PORT" ]; then
+    printf '%s' "$CLI_PORT"
+    return
+  fi
+  resolve_board_value "$ENTRYPOINT" "$board" 'port'
+}
+
+resolve_selected_monitor_config() {
+  if [ -n "$CLI_MONITOR_CONFIG" ]; then
+    printf '%s' "$CLI_MONITOR_CONFIG"
+    return
+  fi
+  if [ -n "$PROJECT_MONITOR_CONFIG" ]; then
+    printf '%s' "$PROJECT_MONITOR_CONFIG"
+    return
+  fi
+  printf '%s' '115200'
+}
+
+stage_project() {
+  local board="$1"
+  local stage_root="$PWD/build-stage/$board"
+  local stage_dir="$stage_root/$SKETCH_NAME"
+  local file
+  local dir
+  local has_sources=0
+
+  rm -rf "$stage_root"
+  mkdir -p "$stage_dir"
+
+  shopt -s nullglob
+  for file in *.ino *.cpp *.c *.h *.hpp; do
+    [ -e "$file" ] || continue
+    ln -s "$PWD/$file" "$stage_dir/$file"
+    has_sources=1
+  done
+  shopt -u nullglob
+
+  [ "$has_sources" -eq 1 ] || die "no sketch sources found in $(pwd)"
+
+  shopt -s nullglob
+  for dir in */; do
+    dir="${dir%/}"
+    case "$dir" in
+      build|build-stage|libraries|.git|.vscode)
+        continue
+        ;;
+    esac
+    if [ -L "$dir" ]; then
+      continue
+    fi
+    if find "$dir" -type f \
+      \( -name '*.ino' -o -name '*.cpp' -o -name '*.c' -o -name '*.h' -o -name '*.hpp' \) \
+      -print -quit | grep -q .; then
+      ln -s "$PWD/$dir" "$stage_dir/$dir"
+    fi
+  done
+  shopt -u nullglob
+
+  printf '%s' "$stage_dir"
+}
+
+run_compile() {
+  local board="$1"
+  local fqbn="$2"
+  local board_options="$3"
+  local build_extra_flags="$4"
+  local build_dir="$PWD/build/$board"
+  local stage_dir
+  local arduino_cli
+  local local_libraries_dir="$PWD/libraries"
+  local compile_args=()
+
+  arduino_cli="$(find_arduino_cli)"
+  stage_dir="$(stage_project "$board")"
+
+  compile_args+=(
+    compile
+    --clean
+    --warnings all
+    --fqbn "$fqbn"
+  )
+
+  if [ -n "$board_options" ]; then
+    compile_args+=(--board-options "$board_options")
+  fi
+
+  compile_args+=(
+    --build-path "$build_dir"
+    --build-property "build.extra_flags=$build_extra_flags"
+  )
+
+  if [ -d "$local_libraries_dir" ]; then
+    compile_args+=(--libraries "$local_libraries_dir")
+  fi
+
+  if [ "${#CLI_ARGS[@]}" -gt 0 ]; then
+    compile_args+=("${CLI_ARGS[@]}")
+  fi
+
+  compile_args+=("$stage_dir")
+  "$arduino_cli" "${compile_args[@]}"
+}
+
+run_upload() {
+  local board="$1"
+  local fqbn="$2"
+  local board_options="$3"
+  local port="$4"
+  local build_dir="$PWD/build/$board"
+  local stage_dir="$PWD/build-stage/$board/$SKETCH_NAME"
+  local arduino_cli
+  local upload_args=()
+
+  [ -n "$port" ] || die "port is required for upload/flash"
+
+  arduino_cli="$(find_arduino_cli)"
+
+  upload_args+=(
+    upload
+    --fqbn "$fqbn"
+    --build-path "$build_dir"
+    --port "$port"
+  )
+
+  if [ -n "$board_options" ]; then
+    upload_args+=(--board-options "$board_options")
+  fi
+
+  if [ "${#CLI_ARGS[@]}" -gt 0 ]; then
+    upload_args+=("${CLI_ARGS[@]}")
+  fi
+
+  upload_args+=("$stage_dir")
+  "$arduino_cli" "${upload_args[@]}"
+}
+
+run_monitor() {
+  local board="$1"
+  local fqbn="$2"
+  local board_options="$3"
+  local port="$4"
+  local monitor_config="$5"
+  local arduino_cli
+  local monitor_args=()
+
+  [ -n "$port" ] || die "port is required for monitor"
+
+  arduino_cli="$(find_arduino_cli)"
+
+  monitor_args+=(
+    monitor
+    --fqbn "$fqbn"
+    --port "$port"
+  )
+
+  if [ -n "$board_options" ]; then
+    monitor_args+=(--board-options "$board_options")
+  fi
+
+  if [ -n "$monitor_config" ]; then
+    monitor_args+=(--config "$monitor_config")
+  fi
+
+  if [ "${#CLI_ARGS[@]}" -gt 0 ]; then
+    monitor_args+=("${CLI_ARGS[@]}")
+  fi
+
+  "$arduino_cli" "${monitor_args[@]}"
+}
+
+command_build_like() {
+  local action="$1"
+  local board
+  local fqbn
+  local board_options
+  local preset
+  local port
+  local monitor_config
+  local build_extra_flags
+
+  load_project_context
+  board="$(resolve_selected_board)"
+  fqbn="$(resolve_board_value "$ENTRYPOINT" "$board" 'fqbn')"
+  board_options="$(resolve_board_value "$ENTRYPOINT" "$board" 'options')"
+  preset="$(resolve_board_value "$ENTRYPOINT" "$board" 'preset')"
+  port="$(resolve_selected_port "$board")"
+  monitor_config="$(resolve_selected_monitor_config)"
+  build_extra_flags="$(resolve_build_extra_flags "$preset")"
+
+  case "$action" in
+    build)
+      run_compile "$board" "$fqbn" "$board_options" "$build_extra_flags"
+      ;;
+    upload|flash)
+      run_compile "$board" "$fqbn" "$board_options" "$build_extra_flags"
+      run_upload "$board" "$fqbn" "$board_options" "$port"
+      ;;
+    monitor)
+      run_monitor "$board" "$fqbn" "$board_options" "$port" "$monitor_config"
+      ;;
+    info)
+      printf '%s\n' \
+        "entrypoint=$ENTRYPOINT" \
+        "sketch=$SKETCH_NAME" \
+        "boards=${PROJECT_BOARDS[*]}" \
+        "board=$board" \
+        "port=$port" \
+        "fqbn=$fqbn" \
+        "board_options=$board_options" \
+        "sgf_hw_preset=$preset" \
+        "build_dir=$PWD/build/$board" \
+        "stage_dir=$PWD/build-stage/$board/$SKETCH_NAME" \
+        "arduino_cli=$(find_arduino_cli)"
+      ;;
+    boards)
+      local project_board
+      for project_board in "${PROJECT_BOARDS[@]}"; do
+        printf '%s: fqbn=%s preset=%s port=%s\n' \
+          "$project_board" \
+          "$(resolve_board_value "$ENTRYPOINT" "$project_board" 'fqbn')" \
+          "$(resolve_board_value "$ENTRYPOINT" "$project_board" 'preset')" \
+          "$(resolve_board_value "$ENTRYPOINT" "$project_board" 'port')"
+      done
+      ;;
+    clean)
+      rm -rf "$PWD/build/$board" "$PWD/build-stage/$board"
+      ;;
+    *)
+      die "unsupported action '$action'"
+      ;;
+  esac
+}
+
+write_gitignore() {
+  local path="$1"
+
+  cat >"$path" <<'EOF'
+/build
+/build-stage
+EOF
+}
+
+write_sketch() {
+  local path="$1"
+  local project_name="$2"
+  local class_name="$3"
+
+  cat >"$path" <<EOF
+// sgf.name: $project_name
+// sgf.boards: unoq, esp32
+// sgf.default_board: unoq
+// sgf.port.unoq: /dev/ttyACM0
+// sgf.port.esp32: /dev/ttyUSB0
+
+// Define SGF_HW_PRESET only for manual IDE builds without \`sgf\`.
+// Examples:
+// #define SGF_HW_PRESET SGF_HW_PRESET_UNOQ_ILI9341_320X240
+// #define SGF_HW_PRESET SGF_HW_PRESET_ESP32_ST7789_240X240
+
+#include <stdint.h>
+
+#include "SGFHardwarePresets.h"
+#include "SGF/Color565.h"
+#include "SGF/Game.h"
+#include "SGF/IScreen.h"
+
+class $class_name : public Game {
+public:
+  explicit $class_name(IScreen& screenRef)
+    : Game(FRAME_DEFAULT_STEP_US, FRAME_MAX_STEP_US),
+      screen(screenRef) {}
+
+  void setup() {
+    start();
+  }
+
+private:
+  static constexpr uint32_t FRAME_DEFAULT_STEP_US = 10000u;
+  static constexpr uint32_t FRAME_MAX_STEP_US = 30000u;
+  static constexpr uint16_t COLOR_BG = Color565::rgb(8, 12, 18);
+
+  IScreen& screen;
+
+  void onSetup() override {
+    screen.fillScreen565(COLOR_BG);
+    resetClock();
+  }
+
+  void onPhysics(float delta) override {
+    (void)delta;
+  }
+
+  void onProcess(float delta) override {
+    (void)delta;
+  }
+};
+
+auto hardware = SGFHardwareProfile::makeRuntime();
+$class_name game(hardware.screen());
+
+void setup() {
+  hardware.display.begin(hardware.profile.display.spiHz);
+  hardware.display.setRotation(hardware.profile.display.rotation);
+  hardware.display.setBacklight(hardware.profile.display.backlightLevel);
+  game.setup();
+}
+
+void loop() {
+  game.loop();
+}
+EOF
+}
+
+init_project() {
+  local target_dir='.'
+  local project_name=''
+  local force=0
+  local sketch_path
+  local gitignore_path
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --name)
+        [ "$#" -ge 2 ] || die "--name requires a value"
+        project_name="$2"
+        shift 2
+        ;;
+      --force)
+        force=1
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      -*)
+        die "unknown init option: $1"
+        ;;
+      *)
+        if [ "$target_dir" != '.' ]; then
+          die "too many init arguments"
+        fi
+        target_dir="$1"
+        shift
+        ;;
+    esac
+  done
+
+  mkdir -p "$target_dir"
+  target_dir="$(cd "$target_dir" && pwd)"
+
+  if [ -z "$project_name" ]; then
+    project_name="$(basename "$target_dir")"
+  fi
+
+  sketch_path="$target_dir/$project_name.ino"
+  gitignore_path="$target_dir/.gitignore"
+
+  if [ "$force" -ne 1 ]; then
+    [ ! -e "$sketch_path" ] || die "file exists: $sketch_path (use --force to overwrite)"
+    [ ! -e "$gitignore_path" ] || die "file exists: $gitignore_path (use --force to overwrite)"
+  fi
+
+  write_gitignore "$gitignore_path"
+  write_sketch "$sketch_path" "$project_name" "$(sanitize_class_name "$project_name")Game"
+
+  printf 'Initialized SGF project in %s\n' "$target_dir"
+  printf 'Next steps:\n'
+  printf '  cd %s\n' "$target_dir"
+  printf '  sgf build board=esp32\n'
+}
+
+main() {
+  local cmd="${1:-help}"
+
+  case "$cmd" in
+    init)
+      shift
+      init_project "$@"
+      ;;
+    build|flash|upload|monitor|boards|info|clean)
+      shift
+      parse_runtime_args "$@"
+      command_build_like "$cmd"
+      ;;
+    help|-h|--help)
+      usage
+      ;;
+    *)
+      die "unknown command: $cmd"
+      ;;
+  esac
+}
+
+main "$@"

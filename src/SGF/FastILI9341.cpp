@@ -154,7 +154,7 @@ void FastILI9341::screenRotation(uint8_t madctl) {
 
 bool FastILI9341::begin(uint32_t spi_hz, uint8_t madctl) {
   if (!bus_.begin(spi_hz)) return false;
-  setBacklight(BACKLIGHT_LEVEL_MAX);
+  applyBacklightLevel(backlightLevel);
 
   hwReset();
 

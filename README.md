@@ -24,6 +24,83 @@ SGF is a lightweight C++ support library for small embedded games. It provides t
 - For rendering, adapt your display to `IRenderTarget` (or use a thin adapter) and use `TileFlusher` with a game-provided region renderer to redraw dirty areas efficiently.
 - Leverage `DirtyRects` to mark updates, `Collision` for basic geometry tests, `Color565` for colors, and pair a display driver such as `FastILI9341` with a platform-specific bus adapter.
 
+## SGF CLI
+SGF ships with a small command-line helper at `tools/sgf`. It creates a project skeleton and wraps `arduino-cli` for build, upload, flash, monitor, and cleanup.
+
+### Requirements
+- `arduino-cli` must be available either in `PATH`, in a common system path such as `/usr/bin/arduino-cli` or `/usr/local/bin/arduino-cli`, or under an Arduino IDE directory passed explicitly as `arduino_ide=/path/to/arduino-ide`.
+- Hardware preset definitions are resolved through the `sgf-hardware-presets` Arduino library.
+- Project-local library overrides may be placed in `./libraries`, for example `./libraries/SGF` and `./libraries/sgf-hardware-presets`.
+
+### Project layout
+An SGF project is expected to have a single sketch entrypoint (`*.ino`) in the project root plus optional local source files. The entrypoint may define SGF metadata as comment lines:
+
+```cpp
+// sgf.name: MyGame
+// sgf.boards: unoq, esp32
+// sgf.default_board: unoq
+// sgf.port.unoq: /dev/ttyACM0
+// sgf.port.esp32: /dev/ttyUSB0
+
+#include "SGFHardwarePresets.h"
+```
+
+Supported metadata keys:
+- `sgf.name`: logical sketch name used for staging/build paths.
+- `sgf.boards`: comma-separated board list enabled for this project.
+- `sgf.default_board`: default board when `board=...` is not passed.
+- `sgf.port.<board>`: default serial port for a given board.
+- `sgf.fqbn.<board>`: overrides the default FQBN for a given board.
+- `sgf.options.<board>`: overrides board options passed to `arduino-cli`.
+- `sgf.preset.<board>`: overrides the `SGF_HW_PRESET` define for a given board.
+- `sgf.extra_flags`: appended to build extra flags.
+- `sgf.monitor_config`: default config passed to `arduino-cli monitor`.
+
+### Creating a project
+Create a new project skeleton:
+
+```bash
+/path/to/SGF/tools/sgf init MyGame
+cd MyGame
+```
+
+This creates:
+- `MyGame.ino`
+- `.gitignore`
+
+If you want to use local library checkouts instead of globally installed Arduino libraries, create:
+
+```text
+MyGame/
+  libraries/
+    SGF
+    sgf-hardware-presets
+```
+
+These may be copies or symlinks.
+
+### Building and flashing
+Typical commands:
+
+```bash
+sgf build board=esp32
+sgf flash board=esp32 port=/dev/ttyUSB0
+sgf monitor board=esp32 port=/dev/ttyUSB0
+sgf info
+sgf clean board=esp32
+```
+
+If `arduino-cli` is bundled inside Arduino IDE and not available in `PATH`, pass the IDE root:
+
+```bash
+sgf build board=esp32 arduino_ide=/opt/arduino-ide
+sgf flash board=esp32 port=/dev/ttyUSB0 arduino_ide=/opt/arduino-ide
+```
+
+Supported built-in board aliases are currently:
+- `unoq`
+- `esp32`
+
 ## Example: Game + Scene
 Below is a minimal example showing a game host with a title scene and a play scene. The title scene starts the game on `FIRE`, while the play scene moves a rectangle and redraws only dirty regions.
 

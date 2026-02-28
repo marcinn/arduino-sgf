@@ -197,7 +197,7 @@ bool FastST7789::begin(uint32_t spi_hz, ScreenRotation initialRotation) {
   if (!bus_.begin(spi_hz)) {
     return false;
   }
-  setBacklight(BACKLIGHT_LEVEL_MAX);
+  applyBacklightLevel(backlightLevel);
 
   hwReset();
 
