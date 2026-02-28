@@ -22,4 +22,5 @@
 #include "SGF/Scene.h"
 #include "SGF/Font5x7.h"
 #include "SGF/TextBlock.h"
+#include "SGF/TextSprite.h"
 #include "SGF/Collision.h"

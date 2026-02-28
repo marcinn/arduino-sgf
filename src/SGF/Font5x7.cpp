@@ -105,6 +105,19 @@ int textWidth(const char* s, int scale) {
   return n * (5 * scale + scale) - scale;
 }
 
+int alignedTextX(int anchorX, const char* s, int scale, AlignX align) {
+  int w = textWidth(s, scale);
+  switch (align) {
+    case AlignX::Center:
+      return anchorX - (w / 2);
+    case AlignX::Right:
+      return anchorX - w + 1;
+    case AlignX::Left:
+    default:
+      return anchorX;
+  }
+}
+
 bool textPixel(const char* s, int scale, int x, int y) {
   if (!s || scale <= 0 || x < 0 || y < 0) return false;
 
@@ -156,6 +169,30 @@ void drawText(
       }
     }
   }
+}
+
+void drawTextBlock(
+  int anchorX,
+  int y,
+  const char* s,
+  int scale,
+  uint16_t color565,
+  AlignX align,
+  FillRectFn fillRect) {
+  FillRectAdapterCtx adapter{fillRect};
+  drawTextBlock(anchorX, y, s, scale, color565, align, &adapter, fillRectAdapter);
+}
+
+void drawTextBlock(
+  int anchorX,
+  int y,
+  const char* s,
+  int scale,
+  uint16_t color565,
+  AlignX align,
+  void* ctx,
+  FillRectCtxFn fillRect) {
+  drawText(alignedTextX(anchorX, s, scale, align), y, s, scale, color565, ctx, fillRect);
 }
 
 void drawCenteredText(int screenW, int y, const char* s, int scale, uint16_t color565, FillRectFn fillRect) {
