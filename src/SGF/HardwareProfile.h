@@ -18,6 +18,8 @@ struct DisplaySetup {
   uint32_t spiHz = 24000000u;
   IScreen::Rotation rotation = IScreen::Rotation::Landscape;
   uint8_t backlightLevel = 255u;
+  uint16_t width = 0;
+  uint16_t height = 0;
 };
 
 struct BoardMeta {
