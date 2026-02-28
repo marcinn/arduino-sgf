@@ -18,6 +18,7 @@ void fillRectAdapter(void* ctx, int x, int y, int w, int h, uint16_t color565) {
 static const uint8_t* glyph(char ch) {
   static const uint8_t GLYPH_SPACE[7] = {0,0,0,0,0,0,0};
   static const uint8_t GLYPH_BALL[7]  = {0x00,0x0E,0x1F,0x1F,0x1F,0x0E,0x00};
+  static const uint8_t GLYPH_EXCLAMATION[7] = {0x04,0x04,0x04,0x04,0x04,0x00,0x04};
   static const uint8_t GLYPH_0[7] = {0x0E,0x11,0x13,0x15,0x19,0x11,0x0E};
   static const uint8_t GLYPH_1[7] = {0x04,0x0C,0x04,0x04,0x04,0x04,0x0E};
   static const uint8_t GLYPH_2[7] = {0x0E,0x11,0x01,0x02,0x04,0x08,0x1F};
@@ -92,6 +93,7 @@ static const uint8_t* glyph(char ch) {
     case 'X': return GLYPH_X;
     case 'Y': return GLYPH_Y;
     case 'Z': return GLYPH_Z;
+    case '!': return GLYPH_EXCLAMATION;
     case ' ': return GLYPH_SPACE;
     case '*': return GLYPH_BALL;
     default:  return GLYPH_SPACE;
