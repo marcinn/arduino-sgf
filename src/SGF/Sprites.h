@@ -82,7 +82,7 @@ public:
       y += dy;
     }
 
-    // Schedules redraw of the current bounds on the next Renderer::flush().
+    // Schedules redraw of the current bounds on the next Renderer2D::flush().
     // Use this when visual content changes without changing sprite bounds.
     void redraw() { ++redrawRevision_; }
 

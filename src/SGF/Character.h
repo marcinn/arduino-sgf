@@ -6,41 +6,20 @@ class Character {
 public:
   using Position = Vector2;
 
-  virtual ~Character() = default;
+  virtual ~Character();
 
-  Vector2 getPosition() const {
-    return Position{posX, posY};
-  }
-
-  void setPosition(const Position& pos) {
-    setPosition(pos.x, pos.y);
-  }
-
-  void setX(int newX) {
-    setPosition(newX, posY);
-  }
-
-  void setY(int newY) {
-    setPosition(posX, newY);
-  }
-
-  void setPosition(int newX, int newY) {
-    posX = newX;
-    posY = newY;
-    didSetPosition();
-  }
+  Vector2 getPosition() const;
+  void setPosition(const Position& pos);
+  void setX(int newX);
+  void setY(int newY);
+  void setPosition(int newX, int newY);
 
 protected:
-  int positionX() const {
-    return posX;
-  }
-
-  int positionY() const {
-    return posY;
-  }
+  int positionX() const;
+  int positionY() const;
 
 private:
-  virtual void didSetPosition() {}
+  virtual void didSetPosition();
 
   int posX = 0;
   int posY = 0;

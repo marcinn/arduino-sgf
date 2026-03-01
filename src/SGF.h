@@ -21,6 +21,7 @@
 #include "SGF/Game.h"
 #include "SGF/Actions.h"
 #include "SGF/InputPin.h"
+#include "SGF/DebouncedInputPin.h"
 #include "SGF/Scene.h"
 #include "SGF/Font5x7.h"
 #include "SGF/TextBlock.h"

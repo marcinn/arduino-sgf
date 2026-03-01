@@ -10,9 +10,9 @@
 #include "Sprites.h"
 #include "TileFlusher.h"
 
-// Renderer facade that combines hardware scroll, background redraw,
+// Renderer2D facade that combines hardware scroll, background redraw,
 // sprite overlay, and dirty-tile flushing.
-class Renderer {
+class Renderer2D {
 public:
   using BackgroundFn = std::function<void(int x0, int y0, int w, int h, int32_t worldX0, int32_t worldY0, uint16_t* buf)>;
   struct StripDesc {
@@ -25,7 +25,7 @@ public:
   };
   using StripFn = std::function<void(const StripDesc& strip, uint16_t* buf)>;
 
-  Renderer(IRenderTarget& target,
+  Renderer2D(IRenderTarget& target,
            SpriteLayer& sprites,
            DirtyRects& dirty,
            int tileW,
@@ -45,7 +45,7 @@ public:
   void resetScrollOffset(uint16_t offset = 0);
 
   // Optional manual dirty mark for callers that want explicit control.
-  // Renderer also auto-tracks sprite bounds across flushes.
+  // Renderer2D also auto-tracks sprite bounds across flushes.
   void markSpriteMovement(const Rect& oldRect, const Rect& newRect);
 
   // Forces a full-screen redraw on the next flush.

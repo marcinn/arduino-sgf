@@ -17,7 +17,7 @@ SGF is a lightweight C++ support library for small embedded games. It provides t
 - **RectFlashAnim**: Utility for animating flashing rectangles, built on `DirtyRects`.
 - **Font5x7**: Fixed 5x7 bitmap font routines (width calculation, pixel sampling, drawing through plain or context-aware fill callbacks).
 - **TextBlock**: Small text primitive that owns its content/style, marks `DirtyRects` on changes, and renders through SGF font callbacks.
-- **Renderer + built-in scroll helper**: `Renderer` owns the 1D scroll helper internally and stitches together optional hardware scroll, background redraw, sprites, and dirty-rect tile flushing. The active on-screen axis depends on rotation (portrait: vertical, landscape: horizontal).
+- **Renderer2D + built-in scroll helper**: `Renderer2D` owns the 1D scroll helper internally and stitches together optional hardware scroll, background redraw, sprites, and dirty-rect tile flushing. The active on-screen axis depends on rotation (portrait: vertical, landscape: horizontal).
 
 ## Typical use
 - Derive your game class from `Game`, override the three lifecycle hooks, and hold your state there.
@@ -305,7 +305,7 @@ SPIArduinoQDisplayBus displayBus(displayBusConfig);
 FastILI9341 display(displayBus);
 SpriteLayer sprites;
 DirtyRects dirty;
-Renderer renderer(display, sprites, dirty, 16, 16);
+Renderer2D renderer(display, sprites, dirty, 16, 16);
 
 uint16_t stripBuf[320 * 16];
 uint16_t regionBuf[16 * 16];
@@ -322,16 +322,16 @@ void setup() {
 
 void loopFrame(int d) { // d>0 moves forward on the active scroll axis
   renderer.scroll(d, stripBuf, 16);       // hardware scroll + sprite ghost cleanup
-  updateSprites(sprites);                 // move sprites; Renderer auto-tracks sprite bounds
+  updateSprites(sprites);                 // move sprites; Renderer2D auto-tracks sprite bounds
   renderer.flush(regionBuf);              // redraw only dirty tiles (background + sprites)
 }
 ```
 
 Key points:
-- `scroll` uses the controller hardware scroll path when the target supports it; otherwise `Renderer` falls back to a full invalidate.
+- `scroll` uses the controller hardware scroll path when the target supports it; otherwise `Renderer2D` falls back to a full invalidate.
 - Rotation defines the visible axis: portrait behaves like vertical scrolling, landscape behaves like horizontal scrolling.
-- `setStripRenderer(...)` is optional. Without it, `Renderer` renders the exposed strip via `BackgroundFn`.
+- `setStripRenderer(...)` is optional. Without it, `Renderer2D` renders the exposed strip via `BackgroundFn`.
 - If used, `StripFn` receives a `StripDesc` (axis + `w/h` + world origin) so the callback does not need direct access to a separate scroller object.
-- `Renderer::scroll(...)` marks sprite ghost regions caused by hardware scroll.
+- `Renderer2D::scroll(...)` marks sprite ghost regions caused by hardware scroll.
 - Sprite movement dirty rects are auto-tracked across `flush()` calls (`markSpriteMovement(...)` remains optional).
-- `Renderer` combines background render, sprite overlay, and tile-based dirty flushing to minimize SPI traffic.
+- `Renderer2D` combines background render, sprite overlay, and tile-based dirty flushing to minimize SPI traffic.

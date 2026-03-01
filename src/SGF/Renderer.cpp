@@ -31,7 +31,7 @@ static void blitSubRectRows(IRenderTarget& target,
 }
 
 // Maps logical screen coordinates to physical GRAM positions while hardware
-// scroll is active. TileFlusher works in screen coordinates, so Renderer::flush
+// scroll is active. TileFlusher works in screen coordinates, so Renderer2D::flush
 // uses this adapter to write dirty tiles to the correct wrapped position.
 class ScrolledRenderTarget : public IRenderTarget {
 public:
@@ -127,7 +127,7 @@ private:
 
 }  // namespace
 
-Renderer::Renderer(IRenderTarget& target,
+Renderer2D::Renderer2D(IRenderTarget& target,
                    SpriteLayer& sprites,
                    DirtyRects& dirty,
                    int tileW,
@@ -140,19 +140,19 @@ Renderer::Renderer(IRenderTarget& target,
     tileW(tileW),
     tileH(tileH) {}
 
-void Renderer::configureScroll(uint16_t fixedStart, uint16_t scrollSpan, uint16_t fixedEnd) {
+void Renderer2D::configureScroll(uint16_t fixedStart, uint16_t scrollSpan, uint16_t fixedEnd) {
   scroller.configure(fixedStart, scrollSpan, fixedEnd);
 }
 
-void Renderer::configureFullScreenScroll() {
+void Renderer2D::configureFullScreenScroll() {
   scroller.configureFullScreen();
 }
 
-void Renderer::resetScrollOffset(uint16_t offset) {
+void Renderer2D::resetScrollOffset(uint16_t offset) {
   scroller.resetOffset(offset);
 }
 
-void Renderer::scroll(int delta, uint16_t* stripBuf, int maxStripLines) {
+void Renderer2D::scroll(int delta, uint16_t* stripBuf, int maxStripLines) {
   if (delta == 0) return;
 
   if (!scroller.usesHardwareScroll()) {
@@ -167,7 +167,7 @@ void Renderer::scroll(int delta, uint16_t* stripBuf, int maxStripLines) {
     stripBuf,
     maxStripLines,
     [&](int32_t worldOffset, int span, uint16_t* buf) {
-      Renderer::StripDesc strip{};
+      Renderer2D::StripDesc strip{};
       strip.alongY = scroller.scrollsAlongY();
       strip.span = span;
       if (strip.alongY) {
@@ -197,7 +197,7 @@ void Renderer::scroll(int delta, uint16_t* stripBuf, int maxStripLines) {
   addSpriteGhosts(delta);
 }
 
-void Renderer::scrollByVelocity(int speedPxPerSec,
+void Renderer2D::scrollByVelocity(int speedPxPerSec,
                                 uint32_t dtMs,
                                 uint16_t* stripBuf,
                                 int maxStripLines) {
@@ -211,11 +211,11 @@ void Renderer::scrollByVelocity(int speedPxPerSec,
   }
 }
 
-void Renderer::resetScrollAccumulator() {
+void Renderer2D::resetScrollAccumulator() {
   scrollAccumMilliPx = 0;
 }
 
-void Renderer::addSpriteGhosts(int delta) {
+void Renderer2D::addSpriteGhosts(int delta) {
   if (delta == 0) return;
   const bool alongY = scroller.scrollsAlongY();
   const int screenShift = -delta;
@@ -244,7 +244,7 @@ void Renderer::addSpriteGhosts(int delta) {
   }
 }
 
-void Renderer::trackSpriteChanges() {
+void Renderer2D::trackSpriteChanges() {
   for (int i = 0; i < SpriteLayer::kMaxSprites; ++i) {
     const auto& s = sprites.sprite(i);
     Rect cur{};
@@ -281,12 +281,12 @@ void Renderer::trackSpriteChanges() {
   }
 }
 
-void Renderer::markSpriteMovement(const Rect& oldRect, const Rect& newRect) {
+void Renderer2D::markSpriteMovement(const Rect& oldRect, const Rect& newRect) {
   dirty.add(oldRect.x0, oldRect.y0, oldRect.x1, oldRect.y1);
   dirty.add(newRect.x0, newRect.y0, newRect.x1, newRect.y1);
 }
 
-void Renderer::invalidate() {
+void Renderer2D::invalidate() {
   dirty.invalidate(target);
 }
 
@@ -302,7 +302,7 @@ static int32_t worldOffsetFromScreenCoord(const HardwareScroller& scroller, int 
   return scroller.worldOffset() + (pos - (int)start);
 }
 
-void Renderer::flush(uint16_t* regionBuf) {
+void Renderer2D::flush(uint16_t* regionBuf) {
   target.tickEffects();
   if (!regionBuf) return;
 
@@ -329,6 +329,6 @@ void Renderer::flush(uint16_t* regionBuf) {
     });
 }
 
-void Renderer::spriteBounds(const SpriteLayer::Sprite& s, Rect* out) {
+void Renderer2D::spriteBounds(const SpriteLayer::Sprite& s, Rect* out) {
   SpriteLayer::spriteBounds(s, &out->x0, &out->y0, &out->x1, &out->y1);
 }
