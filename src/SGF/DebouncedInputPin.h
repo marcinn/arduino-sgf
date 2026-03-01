@@ -15,7 +15,7 @@ class DebouncedInputPin : public InputPin {
 
     explicit DebouncedInputPin(uint8_t pinNumber, bool activeLow = true);
 
-    bool update();
+    bool update(); // returns true when the state changes
     bool isActive() const override;
 
    private:
