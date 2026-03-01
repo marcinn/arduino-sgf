@@ -1,15 +1,15 @@
 #include "DigitalAction.h"
 
 void DigitalAction::update(bool isPressedNow) {
-  justPressedFlag = isPressedNow && !pressedFlag;
-  justReleasedFlag = !isPressedNow && pressedFlag;
-  pressedFlag = isPressedNow;
+    justPressedFlag = isPressedNow && !pressedFlag;
+    justReleasedFlag = !isPressedNow && pressedFlag;
+    pressedFlag = isPressedNow;
 }
 
 void DigitalAction::reset(bool isPressedNow) {
-  pressedFlag = isPressedNow;
-  justPressedFlag = false;
-  justReleasedFlag = false;
+    pressedFlag = isPressedNow;
+    justPressedFlag = false;
+    justReleasedFlag = false;
 }
 
 bool DigitalAction::pressed() const { return pressedFlag; }

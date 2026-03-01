@@ -5,26 +5,21 @@
 
 #include "InputPin.h"
 
+#ifndef DEBOUNCE_INPUT_MS
+#define DEBOUNCE_INPUT_MS 18
+#endif
+
 class DebouncedInputPin : public InputPin {
-public:
-  DebouncedInputPin() = default;
+   public:
+    DebouncedInputPin() = default;
 
-  explicit DebouncedInputPin(uint8_t pinNumber,
-                             bool activeLow = true,
-                             uint16_t debounceMs = 18);
+    explicit DebouncedInputPin(uint8_t pinNumber, bool activeLow = true);
 
-  void setDebounceMs(uint16_t debounceMs);
-  uint16_t debounceMs() const;
+    bool update();
+    bool isActive() const override;
 
-  void reset(bool pressedNow = false);
-  void resetFromPin();
-
-  bool update();
-  bool pressed() const override;
-
-private:
-  uint16_t debounceMsValue = 18;
-  bool stablePressedFlag = false;
-  bool lastRawPressed = false;
-  uint32_t lastRawChangeMs = 0;
+   private:
+    bool stablePressedFlag = false;
+    bool lastRawPressed = false;
+    uint32_t lastRawChangeMs = 0;
 };

@@ -8,7 +8,7 @@ Minimal C++/Arduino guidelines for this repo:
 - Prefer `const`/`constexpr` and references over pointers when `nullptr` is not expected.
 - Avoid dynamic allocation; use static/stack buffers sized for the MCU constraints.
 - Includes: project/local headers in `""`, platform/stdlib in `<...>`; include only what you need.
-- Formatting: 2-space indent, keep lines short (< 100 chars), use spaces after commas and around operators.
+- Formatting: 4-space indent, keep lines short (< 100 chars), use spaces after commas and around operators.
 - Prefer object-centric APIs over exploded argument lists: pass domain objects (e.g. `Paddle`) instead of `x/w/y` bundles when the callee needs that object’s state.
 - Object-specific behavior/config belongs to the object class (e.g. `Ball` launch defaults/bounce rules, `Paddle` movement params), not to `ArkanoidGame`.
 - Avoid redundant wrapper/delegate methods and duplicated logic; if a method only forwards state/behavior without adding value, remove it or move logic to the owning class.
