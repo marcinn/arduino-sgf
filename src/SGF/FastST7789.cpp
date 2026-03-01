@@ -5,6 +5,12 @@
 
 namespace {
 
+constexpr int FILL_SCREEN_STRIP_H = 4;
+constexpr int FILL_SCREEN_MAX_W = 320;
+constexpr int FILL_RECT_MAX_W = 60;
+constexpr int FILL_RECT_MAX_H = 40;
+constexpr int SWAP_TMP_MAX_PIXELS = 320 * 4;
+
 uint16_t be16(uint16_t value) {
   return (uint16_t)((value << 8) | (value >> 8));
 }
@@ -234,17 +240,16 @@ bool FastST7789::begin(uint32_t spi_hz, ScreenRotation initialRotation) {
 }
 
 void FastST7789::fillScreen565(uint16_t color565) {
-  static constexpr int STRIP_H = 10;
-  static uint16_t strip[320 * STRIP_H];
+  static uint16_t strip[FILL_SCREEN_MAX_W * FILL_SCREEN_STRIP_H];
   const bool usePixelWrite = bus_.supportsWritePixels565();
   uint16_t color = usePixelWrite ? color565 : Color565::bswap(color565);
 
-  for (int i = 0; i < 320 * STRIP_H; i++) {
+  for (int i = 0; i < FILL_SCREEN_MAX_W * FILL_SCREEN_STRIP_H; i++) {
     strip[i] = color;
   }
 
-  for (int y = 0; y < curH; y += STRIP_H) {
-    int h = (y + STRIP_H <= curH) ? STRIP_H : (curH - y);
+  for (int y = 0; y < curH; y += FILL_SCREEN_STRIP_H) {
+    int h = (y + FILL_SCREEN_STRIP_H <= curH) ? FILL_SCREEN_STRIP_H : (curH - y);
     setWindow(0, y, curW - 1, y + h - 1);
     streamBegin();
     if (usePixelWrite) {
@@ -282,14 +287,12 @@ void FastST7789::fillRect565(int x0, int y0, int w, int h, uint16_t color565) {
     return;
   }
 
-  static constexpr int MAX_RW = 120;
-  static constexpr int MAX_RH = 80;
-  static uint16_t rectBuf[MAX_RW * MAX_RH];
+  static uint16_t rectBuf[FILL_RECT_MAX_W * FILL_RECT_MAX_H];
 
-  for (int ty = 0; ty < h; ty += MAX_RH) {
-    int hh = min(MAX_RH, h - ty);
-    for (int tx = 0; tx < w; tx += MAX_RW) {
-      int ww = min(MAX_RW, w - tx);
+  for (int ty = 0; ty < h; ty += FILL_RECT_MAX_H) {
+    int hh = min(FILL_RECT_MAX_H, h - ty);
+    for (int tx = 0; tx < w; tx += FILL_RECT_MAX_W) {
+      int ww = min(FILL_RECT_MAX_W, w - tx);
       int count = ww * hh;
       for (int i = 0; i < count; i++) {
         rectBuf[i] = color565;
@@ -314,11 +317,16 @@ void FastST7789::blit565(int x0, int y0, int w, int h, const uint16_t* pix) {
   if (bus_.supportsWritePixels565()) {
     bus_.writePixels565(pix, (size_t)count);
   } else {
-    static uint16_t tmp[120 * 80];
-    for (int i = 0; i < count; i++) {
-      tmp[i] = Color565::bswap(pix[i]);
+    static uint16_t tmp[SWAP_TMP_MAX_PIXELS];
+    int offset = 0;
+    while (offset < count) {
+      int chunk = min(SWAP_TMP_MAX_PIXELS, count - offset);
+      for (int i = 0; i < chunk; i++) {
+        tmp[i] = Color565::bswap(pix[offset + i]);
+      }
+      bus_.writeDataChunk((const uint8_t*)tmp, (size_t)(chunk * 2));
+      offset += chunk;
     }
-    bus_.writeDataChunk((const uint8_t*)tmp, (size_t)(count * 2));
   }
   streamEnd();
 }
