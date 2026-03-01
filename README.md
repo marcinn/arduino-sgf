@@ -159,12 +159,23 @@ private:
   MiniGame& game;
 };
 
+class TitleScene : public Scene {
+public:
+  explicit TitleScene(MiniGame& game) : game(game) {}
+  void onEnter() override;
+  void onPhysics(float delta) override;
+  void onProcess(float delta) override;
+
+private:
+  MiniGame& game;
+};
+
 class MiniGame : public Game {
 public:
   MiniGame(FastILI9341& gfx, uint8_t firePin)
     : Game(10000u, 30000u),
       gfx(gfx),
-      pinFire(firePin),
+      fireInput(firePin, true),
       titleScene(*this),
       playScene(*this) {}
 
@@ -172,9 +183,8 @@ public:
 
 private:
   FastILI9341& gfx;
-  uint8_t pinFire = 0;
-  DigitalAction fireAction;
-  PressReleaseAction fireConfirm;
+  DebouncedInputPin fireInput;
+  ActionState fireAction;
   DirtyRects dirty;
   SceneSwitcher sceneSwitcher;
   TitleScene titleScene;
@@ -208,8 +218,10 @@ private:
   }
 
   void onSetup() override {
-    pinMode(pinFire, INPUT_PULLUP);
-    fireAction.reset(digitalRead(pinFire) == LOW);
+    ActionBinding bindings[] = {
+      {fireInput, fireAction},
+    };
+    configureActions(bindings, sizeof(bindings) / sizeof(bindings[0]));
 
     gfx.begin(24000000u);
     gfx.screenRotation(FastILI9341::ScreenRotation::Landscape);
@@ -219,27 +231,46 @@ private:
   }
 
   void onPhysics(float delta) override {
-    fireAction.update(digitalRead(pinFire) == LOW);
     sceneSwitcher.onPhysics(delta);
   }
 
   void onProcess(float delta) override {
     sceneSwitcher.onProcess(delta);
   }
+
+  void onAction(ActionState& action) override {
+    if (&action != &fireAction || !action.isJustPressed()) {
+      return;
+    }
+    if (sceneSwitcher.current() != &titleScene) {
+      return;
+    }
+
+    gfx.fillScreen565(Color565::rgb(0, 0, 0));
+    sceneSwitcher.switchTo(playScene);
+    resetClock();
+  }
+
+  void onInput(const InputEvent& event) override {
+    if (!event.isActionJustPressed(fireAction)) {
+      return;
+    }
+    if (sceneSwitcher.current() != &titleScene) {
+      return;
+    }
+
+    gfx.fillScreen565(Color565::rgb(0, 0, 0));
+    sceneSwitcher.switchTo(playScene);
+    resetClock();
+  }
 };
 
 void TitleScene::onEnter() {
-  game.fireConfirm.reset();
   game.gfx.fillScreen565(Color565::rgb(4, 8, 20));
 }
 
 void TitleScene::onPhysics(float delta) {
   (void)delta;
-  if (game.fireConfirm.update(game.fireAction)) {
-    game.gfx.fillScreen565(Color565::rgb(0, 0, 0));
-    game.sceneSwitcher.switchTo(game.playScene);
-    game.resetClock();
-  }
 }
 
 void TitleScene::onProcess(float delta) {

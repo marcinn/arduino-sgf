@@ -15,12 +15,43 @@ void Game::start() {
 }
 
 void Game::loop() {
+    updateActionStates();
     float delta = tickSeconds(micros());
     onPhysics(delta);
     onProcess(delta);
 }
 
-void Game::resetClock() { clock.lastUs = micros(); }
+void Game::resetClock() {
+    clock.lastUs = micros();
+}
+
+void Game::configureActions(const ActionBinding* bindings, size_t count) {
+    actionBindings = bindings;
+    actionBindingCount = count;
+    for (size_t i = 0; i < actionBindingCount; ++i) {
+        actionBindings[i].state.reset();
+    }
+}
+
+void Game::updateActionStates() {
+    for (size_t i = 0; i < actionBindingCount; ++i) {
+        bool value = actionBindings[i].input.isActive();
+        ActionState& actionState = actionBindings[i].state;
+        actionState.update(value);
+        if (!actionState.isPressed() &&
+            !actionState.isJustPressed() &&
+            !actionState.isJustReleased()) {
+            continue;
+        }
+
+        currentInputEvent.action = &actionState;
+        currentInputEvent.pressed = actionState.isPressed();
+        currentInputEvent.justPressed = actionState.isJustPressed();
+        currentInputEvent.justReleased = actionState.isJustReleased();
+        onAction(actionState);
+        onInput(currentInputEvent);
+    }
+}
 
 float Game::tickSeconds(uint32_t nowUs) {
     if (clock.lastUs == 0) {
@@ -31,6 +62,8 @@ float Game::tickSeconds(uint32_t nowUs) {
     uint32_t dtUs = nowUs - clock.lastUs;
     clock.lastUs = nowUs;
 
-    if (clock.maxStepUs != 0 && dtUs > clock.maxStepUs) dtUs = clock.maxStepUs;
+    if (clock.maxStepUs != 0 && dtUs > clock.maxStepUs) {
+        dtUs = clock.maxStepUs;
+    }
     return (float)dtUs / 1000000.0f;
 }

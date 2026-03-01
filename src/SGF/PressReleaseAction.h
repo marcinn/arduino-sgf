@@ -1,11 +1,11 @@
 #pragma once
 
-#include "DigitalAction.h"
+#include "ActionState.h"
 
 class PressReleaseAction {
    public:
     void reset();
-    bool update(const DigitalAction& action);
+    bool update(const ActionState& action);
 
    private:
     bool armed = false;
