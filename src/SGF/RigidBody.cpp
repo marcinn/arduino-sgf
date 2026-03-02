@@ -1,5 +1,7 @@
 #include "RigidBody.h"
 
+CollisionBodyType RigidBody::collisionBodyType() const { return CollisionBodyType::Rigid; }
+
 Vector2f RigidBody::getPosition() const { return position; }
 
 void RigidBody::setPosition(const Vector2i& position) {

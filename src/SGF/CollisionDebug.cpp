@@ -1,5 +1,6 @@
 #include "CollisionDebug.h"
 
+#include "CollisionBinding.h"
 #include "CollisionShape.h"
 
 namespace {
@@ -7,6 +8,21 @@ Vector2i floorVector(const Vector2f& value) {
     return Vector2i{(int)value.x, (int)value.y};
 }
 }  // namespace
+
+void CollisionDebug::drawSystem(const CollisionSystem& collisionSystem, IFillRect& fillRect,
+                                uint16_t shapeColor565, uint16_t collisionColor565) {
+    const CollisionBinding* bindings = collisionSystem.bindings();
+    for (size_t i = 0; i < collisionSystem.bindingCount(); ++i) {
+        drawBinding(bindings[i], fillRect, shapeColor565, collisionColor565);
+    }
+}
+
+void CollisionDebug::drawBinding(const CollisionBinding& binding, IFillRect& fillRect,
+                                 uint16_t shapeColor565, uint16_t collisionColor565) {
+    drawCollidable(binding.first(), fillRect, shapeColor565);
+    drawCollidable(binding.second(), fillRect, shapeColor565);
+    drawCollision(binding.state().collision(), fillRect, collisionColor565);
+}
 
 void CollisionDebug::drawCollidable(const ICollidable& collidable, IFillRect& fillRect,
                                     uint16_t color565) {
@@ -43,23 +59,6 @@ void CollisionDebug::drawCollision(const ColliderCollision& collision, IFillRect
     Vector2i position = floorVector(collision.position());
     drawPoint(position, fillRect, color565);
     drawNormal(position, collision.normal(), fillRect, color565);
-}
-
-void CollisionDebug::drawTileCollision(const ColliderCollision& collision, const Vector2i& tileSize,
-                                       const Vector2f& minBounds, IFillRect& fillRect,
-                                       uint16_t color565) {
-    if (!collision.isColliding()) {
-        return;
-    }
-    if (collision.tileX() < 0 || collision.tileY() < 0) {
-        return;
-    }
-
-    Vector2i tileMin = floorVector(minBounds) +
-                       Vector2i{collision.tileX() * tileSize.x, collision.tileY() * tileSize.y};
-    Vector2i tileMax = tileMin + tileSize - Vector2i{1, 1};
-    drawRectOutline(tileMin, tileMax, fillRect, color565);
-    drawCollision(collision, fillRect, color565);
 }
 
 void CollisionDebug::drawPoint(const Vector2i& position, IFillRect& fillRect, uint16_t color565) {

@@ -2,6 +2,10 @@
 
 CharacterBody::~CharacterBody() = default;
 
+CollisionBodyType CharacterBody::collisionBodyType() const {
+    return CollisionBodyType::Character;
+}
+
 Vector2i CharacterBody::getPosition() const { return Position{posX, posY}; }
 
 void CharacterBody::setPosition(const Position& pos) { setPosition(pos.x, pos.y); }

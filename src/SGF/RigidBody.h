@@ -9,6 +9,8 @@ class RigidBody : public ICollidable {
     using Position = Vector2f;
     using Velocity = Vector2f;
 
+    CollisionBodyType collisionBodyType() const override;
+
     Vector2f getPosition() const;
     void setPosition(const Vector2i& position);
     virtual void setPosition(const Vector2f& position);

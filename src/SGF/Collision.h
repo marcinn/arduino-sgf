@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ColliderCollision.h"
+#include "ICollidable.h"
 #include "Vector2.h"
 
 bool circleRectHit(const Vector2i& center, int radius, const Vector2i& rectMin,
@@ -10,3 +12,5 @@ bool circleCircleHit(const Vector2i& aCenter, int aRadius, const Vector2i& bCent
 bool pointInRect(const Vector2i& point, const Vector2i& rectMin, const Vector2i& rectMax);
 bool raycastToRect(const Vector2i& origin, const Vector2i& delta, const Vector2i& rectMin,
                    const Vector2i& rectMax, float* tHit);
+bool collidablesHit(const ICollidable& first, const ICollidable& second);
+ColliderCollision collidablesCollision(const ICollidable& first, const ICollidable& second);

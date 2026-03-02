@@ -46,6 +46,37 @@ void Physics::bounce(RigidBody& body, const Vector2f& normal, float restitution)
     body.setVelocity(velocity - ((1.0f + restitution) * normalVelocity * unitNormal));
 }
 
+void Physics::resolveBodies(RigidBody& first, RigidBody& second, float restitution) {
+    ColliderCollision collision = collidablesCollision(first, second);
+    if (!collision.isColliding()) {
+        return;
+    }
+
+    Vector2f normal = collision.normal();
+    float normalLengthSq = normal.x * normal.x + normal.y * normal.y;
+    if (normalLengthSq <= 0.0f) {
+        return;
+    }
+
+    float normalLength = sqrtf(normalLengthSq);
+    Vector2f unitNormal = normal / normalLength;
+    Vector2f relativeVelocity = first.getVelocity() - second.getVelocity();
+    float normalVelocity = relativeVelocity.x * unitNormal.x + relativeVelocity.y * unitNormal.y;
+    if (normalVelocity >= 0.0f) {
+        return;
+    }
+
+    float inverseMassSum = (1.0f / first.getMass()) + (1.0f / second.getMass());
+    if (inverseMassSum <= 0.0f) {
+        return;
+    }
+
+    float impulseMagnitude = -(1.0f + restitution) * normalVelocity / inverseMassSum;
+    Vector2f impulse = impulseMagnitude * unitNormal;
+    first.setVelocity(first.getVelocity() + (impulse / first.getMass()));
+    second.setVelocity(second.getVelocity() - (impulse / second.getMass()));
+}
+
 void Physics::setGravity(float gravityValue) {
     gravityOverride = gravityValue;
     hasGravityOverride = true;

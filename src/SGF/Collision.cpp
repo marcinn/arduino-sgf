@@ -1,5 +1,84 @@
 #include "Collision.h"
 
+#include "CollisionShape.h"
+
+#include <math.h>
+
+namespace {
+Vector2i floorVector(const Vector2f& value) {
+    return Vector2i{(int)floorf(value.x), (int)floorf(value.y)};
+}
+
+Vector2i ceilVector(const Vector2f& value) {
+    return Vector2i{(int)ceilf(value.x), (int)ceilf(value.y)};
+}
+
+Vector2i rectMinFor(const ICollidable& collidable) {
+    Vector2f center = collidable.getCollisionPosition();
+    CollisionShape shape = collidable.getCollisionShape();
+    if (shape.type() == CollisionShapeType::Rect) {
+        return floorVector(center - (Vector2f{shape.size()} / 2.0f));
+    }
+    if (shape.type() == CollisionShapeType::Circle) {
+        return floorVector(center - Vector2f{(float)shape.radius(), (float)shape.radius()});
+    }
+    return floorVector(center);
+}
+
+Vector2i rectMaxFor(const ICollidable& collidable) {
+    Vector2f center = collidable.getCollisionPosition();
+    CollisionShape shape = collidable.getCollisionShape();
+    if (shape.type() == CollisionShapeType::Rect) {
+        return ceilVector(center + (Vector2f{shape.size()} / 2.0f)) - Vector2i{1, 1};
+    }
+    if (shape.type() == CollisionShapeType::Circle) {
+        float radius = (float)shape.radius();
+        return ceilVector(center + Vector2f{radius, radius}) - Vector2i{1, 1};
+    }
+    return floorVector(center);
+}
+
+Vector2f normalFromRects(const ICollidable& first, const ICollidable& second) {
+    Vector2f delta = first.getCollisionPosition() - second.getCollisionPosition();
+    Vector2i firstMin = rectMinFor(first);
+    Vector2i firstMax = rectMaxFor(first);
+    Vector2i secondMin = rectMinFor(second);
+    Vector2i secondMax = rectMaxFor(second);
+
+    float overlapX = (float)(firstMax.x >= secondMax.x ? secondMax.x - firstMin.x + 1
+                                                       : firstMax.x - secondMin.x + 1);
+    float overlapY = (float)(firstMax.y >= secondMax.y ? secondMax.y - firstMin.y + 1
+                                                       : firstMax.y - secondMin.y + 1);
+    if (overlapX <= overlapY) {
+        return Vector2f{delta.x < 0.0f ? -1.0f : 1.0f, 0.0f};
+    }
+    return Vector2f{0.0f, delta.y < 0.0f ? -1.0f : 1.0f};
+}
+
+Vector2f normalFromPointToRect(const Vector2f& point, const Vector2i& rectMin,
+                               const Vector2i& rectMax) {
+    float leftDistance = fabsf(point.x - rectMin.x);
+    float rightDistance = fabsf((rectMax.x + 1) - point.x);
+    float topDistance = fabsf(point.y - rectMin.y);
+    float bottomDistance = fabsf((rectMax.y + 1) - point.y);
+    float minDistance = leftDistance;
+    Vector2f normal{-1.0f, 0.0f};
+
+    if (rightDistance < minDistance) {
+        minDistance = rightDistance;
+        normal = Vector2f{1.0f, 0.0f};
+    }
+    if (topDistance < minDistance) {
+        minDistance = topDistance;
+        normal = Vector2f{0.0f, -1.0f};
+    }
+    if (bottomDistance < minDistance) {
+        normal = Vector2f{0.0f, 1.0f};
+    }
+    return normal;
+}
+}  // namespace
+
 bool circleRectHit(const Vector2i& center, int radius, const Vector2i& rectMin,
                    const Vector2i& rectMax) {
     int nearestX = center.x;
@@ -89,4 +168,87 @@ bool raycastToRect(const Vector2i& origin, const Vector2i& delta, const Vector2i
         *tHit = t0;
     }
     return true;
+}
+
+bool collidablesHit(const ICollidable& first, const ICollidable& second) {
+    return collidablesCollision(first, second).isColliding();
+}
+
+ColliderCollision collidablesCollision(const ICollidable& first, const ICollidable& second) {
+    ColliderCollision collision;
+    CollisionShape firstShape = first.getCollisionShape();
+    CollisionShape secondShape = second.getCollisionShape();
+    Vector2f firstPosition = first.getCollisionPosition();
+    Vector2f secondPosition = second.getCollisionPosition();
+    Vector2i firstCenter = floorVector(firstPosition);
+    Vector2i secondCenter = floorVector(secondPosition);
+
+    if (firstShape.type() == CollisionShapeType::Point &&
+        secondShape.type() == CollisionShapeType::Point) {
+        if (firstCenter == secondCenter) {
+            collision.setColliding(true);
+            collision.setPosition(firstCenter);
+            collision.setNormal(Vector2f{0.0f, 0.0f});
+        }
+        return collision;
+    }
+
+    if (firstShape.type() == CollisionShapeType::Circle &&
+        secondShape.type() == CollisionShapeType::Circle) {
+        if (!circleCircleHit(firstCenter, firstShape.radius(), secondCenter, secondShape.radius())) {
+            return collision;
+        }
+        Vector2f delta = firstPosition - secondPosition;
+        float len = sqrtf(delta.x * delta.x + delta.y * delta.y);
+        Vector2f normal = len > 0.0f ? delta / len : Vector2f{1.0f, 0.0f};
+        collision.setColliding(true);
+        collision.setPosition((firstPosition + secondPosition) / 2.0f);
+        collision.setNormal(normal);
+        return collision;
+    }
+
+    if ((firstShape.type() == CollisionShapeType::Rect ||
+         firstShape.type() == CollisionShapeType::Point) &&
+        (secondShape.type() == CollisionShapeType::Rect ||
+         secondShape.type() == CollisionShapeType::Point)) {
+        Vector2i firstMin = rectMinFor(first);
+        Vector2i firstMax = rectMaxFor(first);
+        Vector2i secondMin = rectMinFor(second);
+        Vector2i secondMax = rectMaxFor(second);
+        if (!aabbHit(firstMin, firstMax, secondMin, secondMax)) {
+            return collision;
+        }
+        collision.setColliding(true);
+        collision.setPosition((firstPosition + secondPosition) / 2.0f);
+        collision.setNormal(normalFromRects(first, second));
+        return collision;
+    }
+
+    if (firstShape.type() == CollisionShapeType::Circle &&
+        (secondShape.type() == CollisionShapeType::Rect ||
+         secondShape.type() == CollisionShapeType::Point)) {
+        Vector2i secondMin = rectMinFor(second);
+        Vector2i secondMax = rectMaxFor(second);
+        if (!circleRectHit(firstCenter, firstShape.radius(), secondMin, secondMax)) {
+            return collision;
+        }
+        collision.setColliding(true);
+        collision.setPosition(firstPosition);
+        collision.setNormal(normalFromPointToRect(firstPosition, secondMin, secondMax));
+        return collision;
+    }
+
+    if ((firstShape.type() == CollisionShapeType::Rect ||
+         firstShape.type() == CollisionShapeType::Point) &&
+        secondShape.type() == CollisionShapeType::Circle) {
+        ColliderCollision inverted = collidablesCollision(second, first);
+        if (!inverted.isColliding()) {
+            return collision;
+        }
+        collision = inverted;
+        collision.setNormal(-inverted.normal());
+        return collision;
+    }
+
+    return collision;
 }
