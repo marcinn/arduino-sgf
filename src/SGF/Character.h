@@ -4,11 +4,11 @@
 
 class Character {
    public:
-    using Position = Vector2;
+    using Position = Vector2i;
 
     virtual ~Character();
 
-    Vector2 getPosition() const;
+    Vector2i getPosition() const;
     void setPosition(const Position& pos);
     void setX(int newX);
     void setY(int newY);

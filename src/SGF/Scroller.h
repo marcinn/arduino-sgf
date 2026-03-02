@@ -49,11 +49,11 @@ class HardwareScroller {
     bool scrollsAlongY() const { return target_.size().y >= target_.size().x; }
     bool axisInverted() const { return hardwareEnabled_ && target_.scrollAxisInverted(); }
     uint16_t axisLength() const {
-        Vector2 targetSize = target_.size();
+        Vector2i targetSize = target_.size();
         return (uint16_t)(scrollsAlongY() ? targetSize.y : targetSize.x);
     }
     uint16_t crossLength() const {
-        Vector2 targetSize = target_.size();
+        Vector2i targetSize = target_.size();
         return (uint16_t)(scrollsAlongY() ? targetSize.x : targetSize.y);
     }
 

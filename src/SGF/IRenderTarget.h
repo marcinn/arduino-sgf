@@ -7,7 +7,7 @@
 class IRenderTarget {
    public:
     virtual ~IRenderTarget() = default;
-    virtual Vector2 size() const = 0;
+    virtual Vector2i size() const = 0;
     virtual void blit565(int x0, int y0, int w, int h, const uint16_t* pix) = 0;
     virtual void tickEffects() {}
     virtual bool supportsHardwareScroll() const { return false; }

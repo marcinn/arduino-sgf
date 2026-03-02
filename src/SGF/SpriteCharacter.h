@@ -5,9 +5,9 @@
 
 class SpriteCharacter : public Character {
    public:
-    Vector2 getSize() const;
+    Vector2i getSize() const;
     void setSize(int w, int h);
-    void setSize(const Vector2& newSize);
+    void setSize(const Vector2i& newSize);
     void bindSprite(SpriteLayer::Sprite& spriteRef);
 
    protected:
@@ -20,5 +20,5 @@ class SpriteCharacter : public Character {
     void didSetPosition() override;
 
     SpriteLayer::Sprite* boundSpritePtr = nullptr;
-    Vector2 size{};
+    Vector2i size{};
 };

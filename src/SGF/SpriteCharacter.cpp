@@ -1,9 +1,9 @@
 #include "SpriteCharacter.h"
 
-Vector2 SpriteCharacter::getSize() const { return size; }
+Vector2i SpriteCharacter::getSize() const { return size; }
 
 void SpriteCharacter::setSize(int w, int h) {
-    size = Vector2{w, h};
+    size = Vector2i{w, h};
     if (boundSpritePtr) {
         configureBoundSprite(*boundSpritePtr);
         Position pos = getPosition();
@@ -12,7 +12,7 @@ void SpriteCharacter::setSize(int w, int h) {
     }
 }
 
-void SpriteCharacter::setSize(const Vector2& newSize) { setSize(newSize.x, newSize.y); }
+void SpriteCharacter::setSize(const Vector2i& newSize) { setSize(newSize.x, newSize.y); }
 
 void SpriteCharacter::bindSprite(SpriteLayer::Sprite& spriteRef) {
     boundSpritePtr = &spriteRef;

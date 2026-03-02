@@ -53,7 +53,7 @@ void HardwareScroller::scroll(int delta, uint16_t* buf, int maxStripLines,
     // Split large deltas into chunks so the strip buffer always fits.
     int remaining = delta;
     const bool alongY = scrollsAlongY();
-    Vector2 targetSize = target_.size();
+    Vector2i targetSize = target_.size();
     const int cross = alongY ? targetSize.x : targetSize.y;
 
     const bool inverted = axisInverted();

@@ -45,7 +45,7 @@ class FastILI9341 : public IRenderTarget, public IScreen {
     void fadeOutBacklight(uint32_t durationMs) { fadeBacklightTo(BACKLIGHT_LEVEL_MIN, durationMs); }
     void tickEffects() override;
 
-    Vector2 size() const override { return Vector2{curW, curH}; }
+    Vector2i size() const override { return Vector2i{curW, curH}; }
 
     void fillScreen565(uint16_t color565) override;  // Color in native RGB565 (not byte-swapped).
     void fillRect565(int x0, int y0, int w, int h, uint16_t color565) override;

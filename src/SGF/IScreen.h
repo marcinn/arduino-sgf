@@ -19,7 +19,7 @@ class IScreen : public IFillRect {
     virtual void setRotation(Rotation rotation) = 0;
     virtual Rotation rotation() const = 0;
 
-    virtual Vector2 size() const = 0;
+    virtual Vector2i size() const = 0;
 
     virtual void fillScreen565(uint16_t color565) = 0;
 

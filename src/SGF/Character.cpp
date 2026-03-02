@@ -2,7 +2,7 @@
 
 Character::~Character() = default;
 
-Vector2 Character::getPosition() const { return Position{posX, posY}; }
+Vector2i Character::getPosition() const { return Position{posX, posY}; }
 
 void Character::setPosition(const Position& pos) { setPosition(pos.x, pos.y); }
 

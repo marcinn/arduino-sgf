@@ -6,7 +6,7 @@ void TileFlusher::flush(IRenderTarget& target, uint16_t* regionBuf,
                         const RenderRegionFn& renderRegion) {
     if (!renderRegion) return;
 
-    Vector2 targetSize = target.size();
+    Vector2i targetSize = target.size();
     dirty.clip(targetSize.x, targetSize.y);
     dirty.mergeAll();
 

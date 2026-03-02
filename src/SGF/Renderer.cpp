@@ -32,7 +32,7 @@ class ScrolledRenderTarget : public IRenderTarget {
     ScrolledRenderTarget(IRenderTarget& target, const HardwareScroller& scroller)
         : target(target), scroller(scroller) {}
 
-    Vector2 size() const override { return target.size(); }
+    Vector2i size() const override { return target.size(); }
 
     void blit565(int x0, int y0, int w, int h, const uint16_t* pix) override {
         if (!pix || w <= 0 || h <= 0) return;
@@ -153,7 +153,7 @@ void Renderer2D::scroll(int delta, uint16_t* stripBuf, int maxStripLines) {
                         Renderer2D::StripDesc strip{};
                         strip.alongY = scroller.scrollsAlongY();
                         strip.span = span;
-                        Vector2 targetSize = target.size();
+                        Vector2i targetSize = target.size();
                         if (strip.alongY) {
                             strip.w = targetSize.x;
                             strip.h = span;
