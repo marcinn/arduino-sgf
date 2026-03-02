@@ -15,6 +15,7 @@ void Game::start() {
     clock.lastUs = 0;
     onSetup();
     resetClock();
+    resetActions();
 }
 
 void Game::loop() {
