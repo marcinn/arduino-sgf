@@ -3,9 +3,9 @@
 void SpriteRigidBody::bindSprite(Renderer2D::SpriteHandle spriteRef) {
     boundSpritePtr = spriteRef;
     configureBoundSprite(boundSpritePtr);
-    Position pos = getPosition();
+    Vector2f pos = getPosition();
     boundSpritePtr.setActive(true);
-    boundSpritePtr.setPosition(pos.x, pos.y);
+    boundSpritePtr.setPosition(Vector2i{pos});
 }
 
 void SpriteRigidBody::redrawSprite() {
@@ -15,16 +15,16 @@ void SpriteRigidBody::redrawSprite() {
     boundSpritePtr.redraw();
 }
 
-Renderer2D::SpriteHandle& SpriteRigidBody::boundSprite() { return boundSpritePtr; }
-
-const Renderer2D::SpriteHandle& SpriteRigidBody::boundSprite() const { return boundSpritePtr; }
-
-void SpriteRigidBody::didSetPosition() {
-    RigidBody::didSetPosition();
+void SpriteRigidBody::setPosition(const Vector2f& position) {
+    RigidBody::setPosition(position);
     if (!boundSpritePtr.isBound()) {
         return;
     }
-    Position pos = getPosition();
+
     boundSpritePtr.setActive(true);
-    boundSpritePtr.setPosition(pos.x, pos.y);
+    boundSpritePtr.setPosition(Vector2i{position});
 }
+
+Renderer2D::SpriteHandle& SpriteRigidBody::boundSprite() { return boundSpritePtr; }
+
+const Renderer2D::SpriteHandle& SpriteRigidBody::boundSprite() const { return boundSpritePtr; }

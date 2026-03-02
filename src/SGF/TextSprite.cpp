@@ -73,8 +73,6 @@ void TextSprite::fillRect565(int x, int y, int w, int h, uint16_t color565) {
     }
 }
 
-void TextSprite::didSetPosition() { syncBoundSprite(); }
-
 void TextSprite::rebuildBitmap() {
     bitmapW = FontRenderer::textWidth(FONT_5X7, text_, scale);
     bitmapH = text_[0] != '\0' ? FONT_5X7.glyphHeight() * scale : 0;
@@ -115,9 +113,9 @@ void TextSprite::syncBoundSprite() {
             break;
     }
 
-    boundSprite.setAnchor(anchorX, 0.0f);
+    boundSprite.setAnchor(Vector2f{anchorX, 0.0f});
     boundSprite.setBitmap(pixels565, bitmapW > 0 ? bitmapW : 1, bitmapH > 0 ? bitmapH : 1,
                           TRANSPARENT);
-    boundSprite.setPosition(getPosition().x, getPosition().y);
+    boundSprite.setPosition(getPosition());
     boundSprite.setActive(bitmapW > 0 && bitmapH > 0);
 }

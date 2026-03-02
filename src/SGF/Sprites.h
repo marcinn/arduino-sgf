@@ -4,6 +4,8 @@
 
 #include <array>
 
+#include "Vector2.h"
+
 // Simple software sprites layer; meant to be composed over a background buffer.
 // Clients fill sprite/missile slots and call renderRegion(...) after the background
 // for a region is written into the buffer.
@@ -21,20 +23,15 @@ class SpriteLayer {
 
     struct Sprite {
         bool active = false;
-        int x = 0;
-        int y = 0;
+        Vector2i position{};
         int w = 0;
         int h = 0;
         const uint16_t* pixels565 = nullptr;
         uint16_t transparent = 0;  // pixels matching this value are skipped
         Scale scale = Scale::Normal;
-        float anchorX = 0.0f;  // 0.0=left, 1.0=right (can be outside range)
-        float anchorY = 0.0f;  // 0.0=top, 1.0=bottom (can be outside range)
+        Vector2f anchor{};  // 0.0=left/top, 1.0=right/bottom (can be outside range)
 
-        void setAnchor(float ax, float ay) {
-            anchorX = ax;
-            anchorY = ay;
-        }
+        void setAnchor(const Vector2f& newAnchor) { anchor = newAnchor; }
 
         void setScale(Scale newScale) {
             if (scale == newScale) return;
@@ -73,15 +70,9 @@ class SpriteLayer {
             redraw();
         }
 
-        void setPosition(int px, int py) {
-            x = px;
-            y = py;
-        }
+        void setPosition(const Vector2i& newPosition) { position = newPosition; }
 
-        void translate(int dx, int dy) {
-            x += dx;
-            y += dy;
-        }
+        void translate(const Vector2i& delta) { position += delta; }
 
         // Schedules redraw of the current bounds on the next Renderer2D::flush().
         // Use this when visual content changes without changing sprite bounds.

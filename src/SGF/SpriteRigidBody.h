@@ -1,12 +1,15 @@
 #pragma once
 
-#include "SGF/Renderer.h"
-#include "SGF/RigidBody.h"
+#include "Renderer.h"
+#include "RigidBody.h"
 
 class SpriteRigidBody : public RigidBody {
    public:
+    using RigidBody::setPosition;
+
     void bindSprite(Renderer2D::SpriteHandle spriteRef);
     void redrawSprite();
+    void setPosition(const Vector2f& position) override;
 
    protected:
     virtual void configureBoundSprite(Renderer2D::SpriteHandle& sprite) = 0;
@@ -15,7 +18,5 @@ class SpriteRigidBody : public RigidBody {
     const Renderer2D::SpriteHandle& boundSprite() const;
 
    private:
-    void didSetPosition() override;
-
     Renderer2D::SpriteHandle boundSpritePtr;
 };

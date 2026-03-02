@@ -1,6 +1,6 @@
 #include "FastST7789.h"
 
-#include "SGF/Color565.h"
+#include "Color565.h"
 
 namespace {
 constexpr int FILL_SCREEN_STRIP_H = 4;

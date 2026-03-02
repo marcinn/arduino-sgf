@@ -1,6 +1,6 @@
 #include "FastILI9341.h"
 
-#include "SGF/Color565.h"
+#include "Color565.h"
 
 constexpr uint8_t FastILI9341::toMadctl(IScreen::Rotation rotation) {
     switch (rotation) {

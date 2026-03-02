@@ -22,11 +22,11 @@ class Renderer2D : public IRenderer {
 
         bool isBound() const { return sprite != nullptr; }
 
-        void setAnchor(float ax, float ay) {
+        void setAnchor(const Vector2f& anchor) {
             if (!sprite) {
                 return;
             }
-            sprite->setAnchor(ax, ay);
+            sprite->setAnchor(anchor);
         }
 
         void setScale(SpriteLayer::Scale newScale) {
@@ -58,11 +58,11 @@ class Renderer2D : public IRenderer {
             sprite->setActive(enabled);
         }
 
-        void setPosition(int px, int py) {
+        void setPosition(const Vector2i& position) {
             if (!sprite) {
                 return;
             }
-            sprite->setPosition(px, py);
+            sprite->setPosition(position);
         }
 
         void redraw() {

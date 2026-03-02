@@ -2,12 +2,12 @@
 
 #include <string.h>
 
-#include "SGF/Character.h"
-#include "SGF/Font5x7.h"
-#include "SGF/IFillRect.h"
-#include "SGF/Renderer.h"
+#include "CharacterBody.h"
+#include "Font5x7.h"
+#include "IFillRect.h"
+#include "Renderer.h"
 
-class TextSprite : public Character, public IFillRect {
+class TextSprite : public CharacterBody, public IFillRect {
    public:
     enum class AlignX : uint8_t {
         Left,
@@ -30,8 +30,6 @@ class TextSprite : public Character, public IFillRect {
     int height() const;
 
    private:
-    void didSetPosition() override;
-
     void rebuildBitmap();
     void syncBoundSprite();
 

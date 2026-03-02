@@ -8,7 +8,7 @@ void SpriteCharacter::setSize(int w, int h) {
         configureBoundSprite(boundSpritePtr);
         Position pos = getPosition();
         boundSpritePtr.setActive(true);
-        boundSpritePtr.setPosition(pos.x, pos.y);
+        boundSpritePtr.setPosition(pos);
     }
 }
 
@@ -19,18 +19,9 @@ void SpriteCharacter::bindSprite(Renderer2D::SpriteHandle spriteRef) {
     configureBoundSprite(boundSpritePtr);
     Position pos = getPosition();
     boundSpritePtr.setActive(true);
-    boundSpritePtr.setPosition(pos.x, pos.y);
+    boundSpritePtr.setPosition(pos);
 }
 
 Renderer2D::SpriteHandle& SpriteCharacter::boundSprite() { return boundSpritePtr; }
 
 const Renderer2D::SpriteHandle& SpriteCharacter::boundSprite() const { return boundSpritePtr; }
-
-void SpriteCharacter::didSetPosition() {
-    if (!boundSpritePtr.isBound()) {
-        return;
-    }
-    Position pos = getPosition();
-    boundSpritePtr.setActive(true);
-    boundSpritePtr.setPosition(pos.x, pos.y);
-}

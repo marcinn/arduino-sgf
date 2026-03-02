@@ -1,4 +1,4 @@
-#include "SGF/Math.h"
+#include "Math.h"
 
 namespace Math {
 

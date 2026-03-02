@@ -1,9 +1,9 @@
 #pragma once
 
-#include "SGF/Character.h"
-#include "SGF/Renderer.h"
+#include "CharacterBody.h"
+#include "Renderer.h"
 
-class SpriteCharacter : public Character {
+class SpriteCharacter : public CharacterBody {
    public:
     Vector2i getSize() const;
     void setSize(int w, int h);
@@ -17,8 +17,6 @@ class SpriteCharacter : public Character {
     const Renderer2D::SpriteHandle& boundSprite() const;
 
    private:
-    void didSetPosition() override;
-
     Renderer2D::SpriteHandle boundSpritePtr;
     Vector2i size{};
 };

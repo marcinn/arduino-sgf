@@ -51,10 +51,10 @@ void spriteTopLeft(const SpriteLayer::Sprite& s, int* x, int* y) {
     int w = scaledWidth(s);
     int h = scaledHeight(s);
     if (x) {
-        *x = s.x - anchorOffset(s.anchorX, w);
+        *x = s.position.x - anchorOffset(s.anchor.x, w);
     }
     if (y) {
-        *y = s.y - anchorOffset(s.anchorY, h);
+        *y = s.position.y - anchorOffset(s.anchor.y, h);
     }
 }
 
