@@ -5,24 +5,13 @@
 
 #include "BufferFillRect.h"
 #include "DirtyRects.h"
-#include "Font5x7.h"
+#include "FontRenderer.h"
+#include "IFont.h"
 
 class TextBlock {
    public:
-    enum class AlignX : uint8_t {
-        Left,
-        Center,
-        Right,
-    };
+    using AlignX = FontRenderer::AlignX;
 
-    struct Font {
-        int (*textWidth)(const char* text, int scale);
-        void (*drawText)(int x, int y, const char* text, int scale, uint16_t color565,
-                         IFillRect& fillRect);
-        int glyphHeight = 0;
-    };
-
-    static const Font FONT_5X7;
     static constexpr size_t MAX_TEXT_LEN = 63u;
 
     explicit TextBlock(DirtyRects& dirty);
@@ -34,7 +23,7 @@ class TextBlock {
     void setScale(int scale);
     void setColor(uint16_t color565);
     void setAlignX(AlignX align);
-    void setFont(const Font* font);
+    void setFont(const IFont* font);
     void setVisible(bool visible);
 
     int x() const { return posX_; }
@@ -42,7 +31,7 @@ class TextBlock {
     int scale() const { return scale_; }
     uint16_t color() const { return color565_; }
     AlignX alignX() const { return alignX_; }
-    const Font* font() const { return font_; }
+    const IFont* font() const { return font_; }
     bool visible() const { return visible_; }
 
     int width() const;
@@ -52,7 +41,7 @@ class TextBlock {
 
    private:
     DirtyRects& dirty_;
-    const Font* font_ = &FONT_5X7;
+    const IFont* font_ = nullptr;
     AlignX alignX_ = AlignX::Left;
     int posX_ = 0;
     int posY_ = 0;

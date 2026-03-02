@@ -1,5 +1,7 @@
 #include "TextSprite.h"
 
+#include "FontRenderer.h"
+
 void TextSprite::bindSprite(SpriteLayer::Sprite& sprite) {
     boundSprite = &sprite;
     syncBoundSprite();
@@ -74,8 +76,8 @@ void TextSprite::fillRect565(int x, int y, int w, int h, uint16_t color565) {
 void TextSprite::didSetPosition() { syncBoundSprite(); }
 
 void TextSprite::rebuildBitmap() {
-    bitmapW = Font5x7::textWidth(text_, scale);
-    bitmapH = text_[0] != '\0' ? 7 * scale : 0;
+    bitmapW = FontRenderer::textWidth(FONT_5X7, text_, scale);
+    bitmapH = text_[0] != '\0' ? FONT_5X7.glyphHeight() * scale : 0;
     if (bitmapW > MAX_BITMAP_W) {
         bitmapW = MAX_BITMAP_W;
     }
@@ -89,7 +91,7 @@ void TextSprite::rebuildBitmap() {
     }
 
     if (bitmapW > 0 && bitmapH > 0) {
-        Font5x7::drawText(0, 0, text_, scale, color565, *this);
+        FontRenderer::drawText(FONT_5X7, *this, 0, 0, text_, scale, color565);
     }
     syncBoundSprite();
 }

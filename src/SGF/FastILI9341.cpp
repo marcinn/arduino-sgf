@@ -1,7 +1,6 @@
 #include "FastILI9341.h"
 
 #include "SGF/Color565.h"
-#include "SGF/Font5x7.h"
 
 constexpr uint8_t FastILI9341::toMadctl(IScreen::Rotation rotation) {
     switch (rotation) {
@@ -213,10 +212,6 @@ void FastILI9341::fillRect565(int x0, int y0, int w, int h, uint16_t color565) {
             blit565(x0 + tx, y0 + ty, ww, hh, rectBuf);
         }
     }
-}
-
-void FastILI9341::drawText(int x, int y, const char* text, int scale, uint16_t color565) {
-    Font5x7::drawText(x, y, text, scale, color565, *this);
 }
 
 void FastILI9341::blit565(int x0, int y0, int w, int h, const uint16_t* pix) {

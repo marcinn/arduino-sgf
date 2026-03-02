@@ -1,29 +1,11 @@
 #include "TextBlock.h"
 
+#include "Font5x7.h"
+#include "FontRenderer.h"
+
 #include <string.h>
 
-namespace {
-
-int font5x7TextWidth(const char* text, int scale) { return Font5x7::textWidth(text, scale); }
-
-void drawFont5x7Text(int x,
-                     int y,
-                     const char* text,
-                     int scale,
-                     uint16_t color565,
-                     IFillRect& fillRect) {
-    Font5x7::drawText(x, y, text, scale, color565, fillRect);
-}
-
-}  // namespace
-
-const TextBlock::Font TextBlock::FONT_5X7 = {
-    font5x7TextWidth,
-    drawFont5x7Text,
-    7,
-};
-
-TextBlock::TextBlock(DirtyRects& dirty) : dirty_(dirty) {}
+TextBlock::TextBlock(DirtyRects& dirty) : dirty_(dirty), font_(&FONT_5X7) {}
 
 void TextBlock::setText(const char* text) {
     const char* nextText = text ? text : "";
@@ -84,8 +66,8 @@ void TextBlock::setAlignX(AlignX align) {
     markDirtyChange(oldBounds);
 }
 
-void TextBlock::setFont(const Font* font) {
-    const Font* nextFont = font ? font : &FONT_5X7;
+void TextBlock::setFont(const IFont* font) {
+    const IFont* nextFont = font ? font : &FONT_5X7;
     if (font_ == nextFont) {
         return;
     }
@@ -107,9 +89,11 @@ void TextBlock::setVisible(bool visible) {
     markDirtyChange(oldBounds);
 }
 
-int TextBlock::width() const { return hasVisibleText() ? font_->textWidth(text_, scale_) : 0; }
+int TextBlock::width() const {
+    return hasVisibleText() ? FontRenderer::textWidth(*font_, text_, scale_) : 0;
+}
 
-int TextBlock::height() const { return hasVisibleText() ? font_->glyphHeight * scale_ : 0; }
+int TextBlock::height() const { return hasVisibleText() ? font_->glyphHeight() * scale_ : 0; }
 
 void TextBlock::bounds(Rect* out) const {
     if (!out) {
@@ -139,16 +123,16 @@ void TextBlock::render(int x0, int y0, int w, int h, uint16_t* buf) const {
     }
 
     BufferFillRect fillRect(x0, y0, w, h, buf);
-    font_->drawText(drawX(), posY_, text_, scale_, color565_, fillRect);
+    FontRenderer::drawText(*font_, fillRect, drawX(), posY_, text_, scale_, color565_);
 }
 
 bool TextBlock::hasVisibleText() const {
-    return visible_ && text_[0] != '\0' && font_ && font_->textWidth && font_->drawText &&
-           scale_ > 0 && font_->glyphHeight > 0;
+    return visible_ && text_[0] != '\0' && font_ != nullptr && scale_ > 0 &&
+           font_->glyphHeight() > 0;
 }
 
 int TextBlock::drawX() const {
-    int textW = hasVisibleText() ? font_->textWidth(text_, scale_) : 0;
+    int textW = hasVisibleText() ? FontRenderer::textWidth(*font_, text_, scale_) : 0;
     switch (alignX_) {
         case AlignX::Center:
             return posX_ - (textW / 2);

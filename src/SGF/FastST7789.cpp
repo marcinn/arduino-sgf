@@ -1,10 +1,8 @@
 #include "FastST7789.h"
 
 #include "SGF/Color565.h"
-#include "SGF/Font5x7.h"
 
 namespace {
-
 constexpr int FILL_SCREEN_STRIP_H = 4;
 constexpr int FILL_SCREEN_MAX_W = 320;
 constexpr int FILL_RECT_MAX_W = 60;
@@ -263,10 +261,6 @@ void FastST7789::fillRect565(int x0, int y0, int w, int h, uint16_t color565) {
             blit565(x0 + tx, y0 + ty, ww, hh, rectBuf);
         }
     }
-}
-
-void FastST7789::drawText(int x, int y, const char* text, int scale, uint16_t color565) {
-    Font5x7::drawText(x, y, text, scale, color565, *this);
 }
 
 void FastST7789::blit565(int x0, int y0, int w, int h, const uint16_t* pix) {

@@ -15,8 +15,8 @@ SGF is a lightweight C++ support library for small embedded games. It provides t
 - **FastILI9341**: Display driver for ILI9341 (blitting, backlight control, rotation).
 - **Platform bus adapters**: Keep hardware/platform-specific `IDisplayBus` implementations in separate libraries such as `SGF_ESP32` or `SGF_ArduinoQ`, then include them explicitly from the sketch.
 - **RectFlashAnim**: Utility for animating flashing rectangles, built on `DirtyRects`.
-- **Font5x7**: Fixed 5x7 bitmap font routines (width calculation, pixel sampling, drawing through typed fill targets).
-- **TextBlock**: Small text primitive that owns its content/style, marks `DirtyRects` on changes, and renders through typed SGF font targets.
+- **IFont / Font5x7 / FontRenderer**: `IFont` describes glyph metrics/rows, `Font5x7` is the built-in 5x7 bitmap font, and `FontRenderer` draws fonts to `IScreen` / `IFillRect`.
+- **TextBlock**: Small text primitive that owns its content/style, marks `DirtyRects` on changes, and renders through `IFont` + `FontRenderer`.
 - **Renderer2D + built-in scroll helper**: `Renderer2D` owns the 1D scroll helper internally and stitches together optional hardware scroll, background redraw, sprites, and dirty-rect tile flushing. The active on-screen axis depends on rotation (portrait: vertical, landscape: horizontal).
 
 ## Typical use
@@ -24,7 +24,39 @@ SGF is a lightweight C++ support library for small embedded games. It provides t
 - Bind hardware inputs with `ActionBinding` and `configureActions(...)`; `Game` will update the bound inputs and action states each frame.
 - If you use scenes, let `Game` own scene dispatch and enter/switch scenes through `Game::switchScene(...)`.
 - For rendering, adapt your display to `IRenderTarget` (or use a thin adapter) and use `TileFlusher` with a game-provided region renderer to redraw dirty areas efficiently.
+- Render text through `FontRenderer`; display drivers stay display-only and do not provide `drawText(...)` helpers.
 - Leverage `DirtyRects` to mark updates, `Collision` for basic geometry tests, `Color565` for colors, and pair a display driver such as `FastILI9341` with a platform-specific bus adapter.
+
+## Text Rendering
+Text rendering is split into three layers:
+- `IFont`: font description (glyph metrics + row bits)
+- `Font5x7`: built-in bitmap font implementing `IFont`
+- `FontRenderer`: draws an `IFont` to `IScreen` or any `IFillRect`
+
+Draw directly to a screen:
+
+```cpp
+#include "SGF/Font5x7.h"
+#include "SGF/FontRenderer.h"
+
+Font5x7 font;
+FontRenderer::drawText(font, gfx, 10, 20, "HELLO", 2, Color565::rgb(255, 255, 255));
+FontRenderer::drawTextCentered(font, gfx, gfx.size().x / 2, 40, "READY", 2,
+                               Color565::rgb(255, 255, 0));
+```
+
+Draw into a region buffer:
+
+```cpp
+#include "SGF/BufferFillRect.h"
+#include "SGF/Font5x7.h"
+#include "SGF/FontRenderer.h"
+
+uint16_t regionBuf[64 * 16];
+BufferFillRect fillRect(0, 0, 64, 16, regionBuf);
+Font5x7 font;
+FontRenderer::drawText(font, fillRect, 0, 0, "HUD", 2, Color565::rgb(255, 255, 255));
+```
 
 ## SGF CLI
 SGF ships with a small command-line helper at `tools/sgf`. It creates a project skeleton and wraps `arduino-cli` for build, upload, flash, monitor, and cleanup.

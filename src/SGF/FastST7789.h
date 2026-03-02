@@ -74,7 +74,6 @@ class FastST7789 : public IRenderTarget, public IScreen {
 
     void fillScreen565(uint16_t color565) override;
     void fillRect565(int x0, int y0, int w, int h, uint16_t color565) override;
-    void drawText(int x, int y, const char* text, int scale, uint16_t color565);
     void blit565(int x0, int y0, int w, int h, const uint16_t* pix) override;
     void setScrollArea(uint16_t topFixed, uint16_t scrollHeight, uint16_t bottomFixed) override;
     void scrollTo(uint16_t yOffset) override;

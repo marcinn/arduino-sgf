@@ -1,11 +1,10 @@
 #include "Font5x7.h"
 
-#include "IFillRect.h"
-#include "IScreen.h"
+const Font5x7 FONT_5X7;
 
-namespace Font5x7 {
+namespace {
 
-static const uint8_t* glyph(char ch) {
+const uint8_t* glyph(char ch) {
     static const uint8_t GLYPH_SPACE[7] = {0, 0, 0, 0, 0, 0, 0};
     static const uint8_t GLYPH_BALL[7] = {0x00, 0x0E, 0x1F, 0x1F, 0x1F, 0x0E, 0x00};
     static const uint8_t GLYPH_EXCLAMATION[7] = {0x04, 0x04, 0x04, 0x04, 0x04, 0x00, 0x04};
@@ -130,82 +129,23 @@ static const uint8_t* glyph(char ch) {
     }
 }
 
-int textWidth(const char* s, int scale) {
-    int n = 0;
-    for (const char* p = s; *p; ++p) n++;
-    if (n == 0) return 0;
-    return n * (5 * scale + scale) - scale;
+}  // namespace
+
+int Font5x7::glyphWidth() const {
+    return 5;
 }
 
-int alignedTextX(int anchorX, const char* s, int scale, AlignX align) {
-    int w = textWidth(s, scale);
-    switch (align) {
-        case AlignX::Center:
-            return anchorX - (w / 2);
-        case AlignX::Right:
-            return anchorX - w + 1;
-        case AlignX::Left:
-        default:
-            return anchorX;
+int Font5x7::glyphHeight() const {
+    return 7;
+}
+
+int Font5x7::glyphAdvance() const {
+    return 6;
+}
+
+uint8_t Font5x7::glyphRowBits(char ch, int row) const {
+    if (row < 0 || row >= glyphHeight()) {
+        return 0;
     }
+    return glyph(ch)[row];
 }
-
-bool textPixel(const char* s, int scale, int x, int y) {
-    if (!s || scale <= 0 || x < 0 || y < 0) return false;
-
-    const int charW = 5 * scale;
-    const int advance = charW + scale;
-    const int row = y / scale;
-    if (row < 0 || row >= 7) return false;
-
-    const int charIndex = x / advance;
-    const int localX = x % advance;
-    if (localX >= charW) return false;  // inter-char gap
-
-    const char* p = s;
-    for (int i = 0; i < charIndex && *p; i++) ++p;
-    if (*p == '\0') return false;
-
-    const int col = localX / scale;
-    const uint8_t bits = glyph(*p)[row];
-    return (bits & (1u << (4 - col))) != 0;
-}
-
-void drawText(int x, int y, const char* s, int scale, uint16_t color565, IFillRect& fillRect) {
-    if (!s || scale <= 0) {
-        return;
-    }
-
-    const int advance = 5 * scale + scale;
-    int cx = x;
-    for (const char* p = s; *p; ++p, cx += advance) {
-        const uint8_t* g = glyph(*p);
-        for (int row = 0; row < 7; row++) {
-            uint8_t bits = g[row];
-            for (int col = 0; col < 5; col++) {
-                if (bits & (1u << (4 - col))) {
-                    fillRect.fillRect565(cx + col * scale, y + row * scale, scale, scale,
-                                         color565);
-                }
-            }
-        }
-    }
-}
-
-void drawTextBlock(int anchorX, int y, const char* s, int scale, uint16_t color565, AlignX align,
-                   IFillRect& fillRect) {
-    drawText(alignedTextX(anchorX, s, scale, align), y, s, scale, color565, fillRect);
-}
-
-void drawCenteredText(IFillRect& fillRect, int areaWidth, int y, const char* s, int scale,
-                      uint16_t color565) {
-    int w = textWidth(s, scale);
-    int x = (areaWidth - w) / 2;
-    drawText(x, y, s, scale, color565, fillRect);
-}
-
-void drawCenteredText(IScreen& screen, int y, const char* s, int scale, uint16_t color565) {
-    drawCenteredText(screen, screen.size().x, y, s, scale, color565);
-}
-
-}  // namespace Font5x7
