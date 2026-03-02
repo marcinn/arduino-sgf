@@ -1,6 +1,7 @@
 #pragma once
 #include "SGF/ActionState.h"
 #include "SGF/ActionBinding.h"
+#include "SGF/AreaCollider.h"
 #include "SGF/BufferFillRect.h"
 #include "SGF/CharacterBody.h"
 #include "SGF/Collision.h"

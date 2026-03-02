@@ -21,6 +21,12 @@ void RigidBody::setVelocity(const Vector2f& velocity) {
     onFloor = false;
 }
 
+float RigidBody::getLinearDamp() const { return linearDamp; }
+
+void RigidBody::setLinearDamp(float linearDampValue) {
+    linearDamp = linearDampValue >= 0.0f ? linearDampValue : 0.0f;
+}
+
 float RigidBody::getMass() const { return mass; }
 
 void RigidBody::setMass(float massValue) {

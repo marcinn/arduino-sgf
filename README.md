@@ -8,10 +8,12 @@ SGF is a lightweight C++ support library for small embedded games. It provides t
 - **Actions**: Input state helpers built around `ActionState`, `ActionBinding`, and `InputEvent`. `Game` updates bound inputs, emits `pressed` / `justPressed` / `justReleased`, and `resetActions()` can resync action state to the current hardware snapshot without emitting edge events.
 - **IRenderTarget**: Minimal interface for render targets (`size()`, `blit565(...)`) to decouple flushing from concrete display drivers.
 - **TileFlusher**: Tile-based dirty-rect flusher. Takes `DirtyRects`, an `IRenderTarget`, and a tile render callback to repaint only modified regions in bounded tiles.
-- **Sprites**: Software sprite layer with fixed slots (sprites + missiles), transparent key, and simple horizontal scaling modes; intended to be composed over a background buffer.
+- **Sprites**: `Sprite`, `Missile`, and `SpriteLayer` provide fixed-slot software sprites over a background buffer. Gameplay code binds renderer sprite handles; the renderer owns sprite storage.
 - **SpriteCharacter / SpriteRigidBody**: Small helpers that bind a renderer sprite handle to a `Character` or `RigidBody` and keep sprite position in sync with object position.
 - **DirtyRects**: Simple registry of rectangles to refresh, with clip/merge helpers to reduce overdraw.
-- **Collision**: Collision helpers, including circle-rectangle intersection.
+- **Collision**: Low-level geometry helpers using `Vector2i` inputs (`aabbHit`, `circleRectHit`, `raycastToRect`, etc.).
+- **RigidBody / Physics**: `RigidBody` stores position, velocity, mass, forces, and `linearDamp`. `Physics` integrates motion, applies gravity, and can reflect velocity with `bounce(...)`; collision detection / clamping stays outside `Physics`.
+- **AreaCollider**: Simple world-bounds collider with per-edge response. It clamps a `RigidBody` to an area, uses `Physics::bounce(...)` on contacted edges, can mark floor contact on the bottom edge, and can optionally adjust the edge response through a callback.
 - **Color565**: RGB565 helpers (`Color565::rgb(...)`, `Color565::lighten(...)`, `Color565::darken(...)`, `Color565::bswap(...)`).
 - **FastILI9341**: Display driver for ILI9341 (blitting, backlight control, rotation).
 - **Platform bus adapters**: Keep hardware/platform-specific `IDisplayBus` implementations in separate libraries such as `SGF_ESP32` or `SGF_ArduinoQ`, then include them explicitly from the sketch.
@@ -28,6 +30,13 @@ SGF is a lightweight C++ support library for small embedded games. It provides t
 - Render text through `FontRenderer`; display drivers stay display-only and do not provide `drawText(...)` helpers.
 - Leverage `DirtyRects` to mark updates, `Collision` for basic geometry tests, `Color565` for colors, and pair a display driver such as `FastILI9341` with a platform-specific bus adapter.
 
+## Physics Notes
+- `Physics::integrate(...)` updates velocity and position from accumulated forces, gravity, mass, and `RigidBody::linearDamp`.
+- `Physics::bounce(...)` only reflects velocity along a supplied collision normal; it does not clamp position or detect collisions.
+- `AreaCollider::resolve(...)` is one simple way to clamp a body to world bounds and then invoke `Physics::bounce(...)`.
+- `AreaCollider` supports separate left/right/top/bottom restitution and an optional `calculateResponse` callback to override the final edge response.
+- World/tile collision response should resolve penetration separately, then optionally call `Physics::bounce(...)`.
+
 ## Text Rendering
 Text rendering is split into three layers:
 - `IFont`: font description (glyph metrics + row bits)
@@ -40,9 +49,8 @@ Draw directly to a screen:
 #include "SGF/Font5x7.h"
 #include "SGF/FontRenderer.h"
 
-Font5x7 font;
-FontRenderer::drawText(font, gfx, 10, 20, "HELLO", 2, Color565::rgb(255, 255, 255));
-FontRenderer::drawTextCentered(font, gfx, gfx.size().x / 2, 40, "READY", 2,
+FontRenderer::drawText(FONT_5X7, gfx, 10, 20, "HELLO", 2, Color565::rgb(255, 255, 255));
+FontRenderer::drawTextCentered(FONT_5X7, gfx, gfx.size().x / 2, 40, "READY", 2,
                                Color565::rgb(255, 255, 0));
 ```
 
@@ -55,8 +63,7 @@ Draw into a region buffer:
 
 uint16_t regionBuf[64 * 16];
 BufferFillRect fillRect(0, 0, 64, 16, regionBuf);
-Font5x7 font;
-FontRenderer::drawText(font, fillRect, 0, 0, "HUD", 2, Color565::rgb(255, 255, 255));
+FontRenderer::drawText(FONT_5X7, fillRect, 0, 0, "HUD", 2, Color565::rgb(255, 255, 255));
 ```
 
 ## SGF CLI

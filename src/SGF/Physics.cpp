@@ -9,71 +9,34 @@ void Physics::integrate(RigidBody& body, float delta) {
     Vector2f velocity = body.getVelocity();
     velocity += (body.accumulatedForce / body.getMass()) * delta;
     velocity.y += gravity() * delta;
+    if (body.getLinearDamp() > 0.0f) {
+        float dampFactor = 1.0f - (body.getLinearDamp() * delta);
+        if (dampFactor < 0.0f) {
+            dampFactor = 0.0f;
+        }
+        velocity *= dampFactor;
+    }
     body.setVelocity(velocity);
     body.setPosition(body.getPosition() + velocity * delta);
     body.setOnFloor(false);
     body.accumulatedForce = Vector2f{};
 }
 
-void Physics::bounceWithinX(RigidBody& body, int minX, int maxX, float bounce) {
-    Vector2f position = body.getPosition();
-    Vector2f velocity = body.getVelocity();
-
-    if (position.x <= (float)minX) {
-        position.x = (float)minX;
-        velocity.x = fabsf(velocity.x) * bounce;
-        body.setPosition(position);
-        body.setVelocity(velocity);
-    } else if (position.x >= (float)maxX) {
-        position.x = (float)maxX;
-        velocity.x = -fabsf(velocity.x) * bounce;
-        body.setPosition(position);
-        body.setVelocity(velocity);
-    }
-}
-
-void Physics::bounceOnCeiling(RigidBody& body, int minY, float bounce) {
-    Vector2f position = body.getPosition();
-    Vector2f velocity = body.getVelocity();
-
-    if (position.y <= (float)minY) {
-        position.y = (float)minY;
-        velocity.y = fabsf(velocity.y) * bounce;
-        body.setPosition(position);
-        body.setVelocity(velocity);
-    }
-}
-
-void Physics::bounceOnFloor(RigidBody& body, int maxY, float bounce, float settleSpeed) {
-    Vector2f position = body.getPosition();
-    Vector2f velocity = body.getVelocity();
-
-    if (position.y < (float)maxY) {
+void Physics::bounce(RigidBody& body, const Vector2f& normal, float restitution) {
+    float normalLengthSq = normal.x * normal.x + normal.y * normal.y;
+    if (normalLengthSq <= 0.0f) {
         return;
     }
 
-    position.y = (float)maxY;
-    velocity.y = -fabsf(velocity.y) * bounce;
-    if (settleSpeed > 0.0f && fabsf(velocity.y) <= settleSpeed) {
-        velocity.y = 0.0f;
-    }
-    body.setPosition(position);
-    body.setVelocity(velocity);
-    body.setOnFloor(settleSpeed > 0.0f && velocity.y == 0.0f);
-}
-
-void Physics::applyHorizontalDrag(RigidBody& body, float dragPerSec, float delta, float stopSpeed) {
     Vector2f velocity = body.getVelocity();
-    float dragFactor = 1.0f - (dragPerSec * delta);
-    if (dragFactor < 0.0f) {
-        dragFactor = 0.0f;
+    float normalLength = sqrtf(normalLengthSq);
+    Vector2f unitNormal = normal / normalLength;
+    float normalVelocity = velocity.x * unitNormal.x + velocity.y * unitNormal.y;
+    if (normalVelocity >= 0.0f) {
+        return;
     }
 
-    velocity.x *= dragFactor;
-    if (stopSpeed > 0.0f && fabsf(velocity.x) <= stopSpeed) {
-        velocity.x = 0.0f;
-    }
-    body.setVelocity(velocity);
+    body.setVelocity(velocity - ((1.0f + restitution) * normalVelocity * unitNormal));
 }
 
 void Physics::setGravity(float gravityValue) {
