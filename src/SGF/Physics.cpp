@@ -3,42 +3,42 @@
 #include <math.h>
 
 void Physics::integrate(RigidBody& body, float delta) {
-    body.velY += body.gravityY * delta;
-    body.posXf += body.velX * delta;
-    body.posYf += body.velY * delta;
+    body.velocity.y += body.gravityY * delta;
+    body.physicsPosition.x += body.velocity.x * delta;
+    body.physicsPosition.y += body.velocity.y * delta;
     body.onFloor = false;
     body.syncPosition();
 }
 
 void Physics::bounceWithinX(RigidBody& body, int minX, int maxX, float bounce) {
-    if (body.posXf <= (float)minX) {
-        body.posXf = (float)minX;
-        body.velX = fabsf(body.velX) * bounce;
+    if (body.physicsPosition.x <= (float)minX) {
+        body.physicsPosition.x = (float)minX;
+        body.velocity.x = fabsf(body.velocity.x) * bounce;
         body.syncPosition();
-    } else if (body.posXf >= (float)maxX) {
-        body.posXf = (float)maxX;
-        body.velX = -fabsf(body.velX) * bounce;
+    } else if (body.physicsPosition.x >= (float)maxX) {
+        body.physicsPosition.x = (float)maxX;
+        body.velocity.x = -fabsf(body.velocity.x) * bounce;
         body.syncPosition();
     }
 }
 
 void Physics::bounceOnCeiling(RigidBody& body, int minY, float bounce) {
-    if (body.posYf <= (float)minY) {
-        body.posYf = (float)minY;
-        body.velY = fabsf(body.velY) * bounce;
+    if (body.physicsPosition.y <= (float)minY) {
+        body.physicsPosition.y = (float)minY;
+        body.velocity.y = fabsf(body.velocity.y) * bounce;
         body.syncPosition();
     }
 }
 
 void Physics::bounceOnFloor(RigidBody& body, int maxY, float bounce, float settleSpeed) {
-    if (body.posYf < (float)maxY) {
+    if (body.physicsPosition.y < (float)maxY) {
         return;
     }
 
-    body.posYf = (float)maxY;
-    body.velY = -fabsf(body.velY) * bounce;
-    if (settleSpeed > 0.0f && fabsf(body.velY) <= settleSpeed) {
-        body.velY = 0.0f;
+    body.physicsPosition.y = (float)maxY;
+    body.velocity.y = -fabsf(body.velocity.y) * bounce;
+    if (settleSpeed > 0.0f && fabsf(body.velocity.y) <= settleSpeed) {
+        body.velocity.y = 0.0f;
         body.onFloor = true;
     } else {
         body.onFloor = false;
@@ -51,8 +51,8 @@ void Physics::applyHorizontalDrag(RigidBody& body, float dragPerSec, float delta
     if (dragFactor < 0.0f) {
         dragFactor = 0.0f;
     }
-    body.velX *= dragFactor;
-    if (stopSpeed > 0.0f && fabsf(body.velX) <= stopSpeed) {
-        body.velX = 0.0f;
+    body.velocity.x *= dragFactor;
+    if (stopSpeed > 0.0f && fabsf(body.velocity.x) <= stopSpeed) {
+        body.velocity.x = 0.0f;
     }
 }

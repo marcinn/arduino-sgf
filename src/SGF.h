@@ -29,6 +29,7 @@
 #include "SGF/Scene.h"
 #include "SGF/Scroller.h"
 #include "SGF/SpriteCharacter.h"
+#include "SGF/SpriteRigidBody.h"
 #include "SGF/Sprites.h"
 #include "SGF/TextBlock.h"
 #include "SGF/TextSprite.h"

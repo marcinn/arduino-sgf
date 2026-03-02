@@ -1,14 +1,12 @@
 #pragma once
 
-#include "SGF/Character.h"
 #include "SGF/Renderer.h"
+#include "SGF/RigidBody.h"
 
-class SpriteCharacter : public Character {
+class SpriteRigidBody : public RigidBody {
    public:
-    Vector2i getSize() const;
-    void setSize(int w, int h);
-    void setSize(const Vector2i& newSize);
     void bindSprite(Renderer2D::SpriteHandle spriteRef);
+    void redrawSprite();
 
    protected:
     virtual void configureBoundSprite(Renderer2D::SpriteHandle& sprite) = 0;
@@ -20,5 +18,4 @@ class SpriteCharacter : public Character {
     void didSetPosition() override;
 
     Renderer2D::SpriteHandle boundSpritePtr;
-    Vector2i size{};
 };

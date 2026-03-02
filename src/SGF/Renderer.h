@@ -16,6 +16,70 @@
 // sprite overlay, and dirty-tile flushing.
 class Renderer2D : public IRenderer {
    public:
+    class SpriteHandle {
+       public:
+        SpriteHandle() = default;
+
+        bool isBound() const { return sprite != nullptr; }
+
+        void setAnchor(float ax, float ay) {
+            if (!sprite) {
+                return;
+            }
+            sprite->setAnchor(ax, ay);
+        }
+
+        void setScale(SpriteLayer::Scale newScale) {
+            if (!sprite) {
+                return;
+            }
+            sprite->setScale(newScale);
+        }
+
+        void setBitmap(const uint16_t* pixels, int width, int height) {
+            if (!sprite) {
+                return;
+            }
+            sprite->setBitmap(pixels, width, height);
+        }
+
+        void setBitmap(const uint16_t* pixels, int width, int height,
+                       uint16_t transparentColor) {
+            if (!sprite) {
+                return;
+            }
+            sprite->setBitmap(pixels, width, height, transparentColor);
+        }
+
+        void setActive(bool enabled) {
+            if (!sprite) {
+                return;
+            }
+            sprite->setActive(enabled);
+        }
+
+        void setPosition(int px, int py) {
+            if (!sprite) {
+                return;
+            }
+            sprite->setPosition(px, py);
+        }
+
+        void redraw() {
+            if (!sprite) {
+                return;
+            }
+            sprite->redraw();
+        }
+
+       private:
+        friend class Renderer2D;
+
+        explicit SpriteHandle(SpriteLayer::Sprite* sprite) : sprite(sprite) {}
+
+        SpriteLayer::Sprite* sprite = nullptr;
+    };
+
     using BackgroundFn = std::function<void(int x0, int y0, int w, int h, int32_t worldX0,
                                             int32_t worldY0, uint16_t* buf)>;
     struct StripDesc {
@@ -28,12 +92,12 @@ class Renderer2D : public IRenderer {
     };
     using StripFn = std::function<void(const StripDesc& strip, uint16_t* buf)>;
 
-    Renderer2D(IRenderTarget& target, SpriteLayer& sprites, DirtyRects& dirty, int tileW,
-               int tileH);
+    Renderer2D(IRenderTarget& target, DirtyRects& dirty, int tileW, int tileH);
 
     void setBackgroundRenderer(const BackgroundFn& fn) { bgFn = fn; }
     void setStripRenderer(const StripFn& fn) { stripFn = fn; }
     void setRegionBuffer(uint16_t* buffer) { regionBuf = buffer; }
+    SpriteHandle sprite(int index) { return SpriteHandle(&sprites.sprite(index)); }
 
     // Scrolls the background by `delta` pixels on the active scroll axis and adds
     // dirty rects to clean sprite ghosts caused by the hardware scroll.
@@ -60,7 +124,7 @@ class Renderer2D : public IRenderer {
    private:
     IRenderTarget& target;
     HardwareScroller scroller;
-    SpriteLayer& sprites;
+    SpriteLayer sprites;
     DirtyRects& dirty;
     TileFlusher flusher;
     BackgroundFn bgFn{};

@@ -120,11 +120,9 @@ class ScrolledRenderTarget : public IRenderTarget {
 
 }  // namespace
 
-Renderer2D::Renderer2D(IRenderTarget& target, SpriteLayer& sprites, DirtyRects& dirty, int tileW,
-                       int tileH)
+Renderer2D::Renderer2D(IRenderTarget& target, DirtyRects& dirty, int tileW, int tileH)
     : target(target),
       scroller(target),
-      sprites(sprites),
       dirty(dirty),
       flusher(dirty, tileW, tileH),
       tileW(tileW),

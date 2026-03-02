@@ -2,8 +2,8 @@
 
 #include "FontRenderer.h"
 
-void TextSprite::bindSprite(SpriteLayer::Sprite& sprite) {
-    boundSprite = &sprite;
+void TextSprite::bindSprite(Renderer2D::SpriteHandle sprite) {
+    boundSprite = sprite;
     syncBoundSprite();
 }
 
@@ -97,7 +97,7 @@ void TextSprite::rebuildBitmap() {
 }
 
 void TextSprite::syncBoundSprite() {
-    if (!boundSprite) {
+    if (!boundSprite.isBound()) {
         return;
     }
 
@@ -115,9 +115,9 @@ void TextSprite::syncBoundSprite() {
             break;
     }
 
-    boundSprite->setAnchor(anchorX, 0.0f);
-    boundSprite->setBitmap(pixels565, bitmapW > 0 ? bitmapW : 1, bitmapH > 0 ? bitmapH : 1,
-                           TRANSPARENT);
-    boundSprite->setPosition(getPosition().x, getPosition().y);
-    boundSprite->setActive(bitmapW > 0 && bitmapH > 0);
+    boundSprite.setAnchor(anchorX, 0.0f);
+    boundSprite.setBitmap(pixels565, bitmapW > 0 ? bitmapW : 1, bitmapH > 0 ? bitmapH : 1,
+                          TRANSPARENT);
+    boundSprite.setPosition(getPosition().x, getPosition().y);
+    boundSprite.setActive(bitmapW > 0 && bitmapH > 0);
 }

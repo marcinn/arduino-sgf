@@ -16,8 +16,4 @@ void Character::setPosition(int newX, int newY) {
     didSetPosition();
 }
 
-int Character::positionX() const { return posX; }
-
-int Character::positionY() const { return posY; }
-
 void Character::didSetPosition() {}

@@ -5,7 +5,7 @@
 #include "SGF/Character.h"
 #include "SGF/Font5x7.h"
 #include "SGF/IFillRect.h"
-#include "SGF/Sprites.h"
+#include "SGF/Renderer.h"
 
 class TextSprite : public Character, public IFillRect {
    public:
@@ -20,7 +20,7 @@ class TextSprite : public Character, public IFillRect {
     static constexpr int MAX_BITMAP_H = 32;
     static constexpr uint16_t TRANSPARENT = 0x0000u;
 
-    void bindSprite(SpriteLayer::Sprite& sprite);
+    void bindSprite(Renderer2D::SpriteHandle sprite);
     void setText(const char* text);
     void setScale(int newScale);
     void setColor(uint16_t newColor565);
@@ -35,7 +35,7 @@ class TextSprite : public Character, public IFillRect {
     void rebuildBitmap();
     void syncBoundSprite();
 
-    SpriteLayer::Sprite* boundSprite = nullptr;
+    Renderer2D::SpriteHandle boundSprite;
     AlignX alignX = AlignX::Left;
     int scale = 1;
     int bitmapW = 0;

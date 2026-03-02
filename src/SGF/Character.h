@@ -14,10 +14,6 @@ class Character {
     void setY(int newY);
     void setPosition(int newX, int newY);
 
-   protected:
-    int positionX() const;
-    int positionY() const;
-
    private:
     virtual void didSetPosition();
 

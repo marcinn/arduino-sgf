@@ -4,33 +4,33 @@ Vector2i SpriteCharacter::getSize() const { return size; }
 
 void SpriteCharacter::setSize(int w, int h) {
     size = Vector2i{w, h};
-    if (boundSpritePtr) {
-        configureBoundSprite(*boundSpritePtr);
+    if (boundSpritePtr.isBound()) {
+        configureBoundSprite(boundSpritePtr);
         Position pos = getPosition();
-        boundSpritePtr->active = true;
-        boundSpritePtr->setPosition(pos.x, pos.y);
+        boundSpritePtr.setActive(true);
+        boundSpritePtr.setPosition(pos.x, pos.y);
     }
 }
 
 void SpriteCharacter::setSize(const Vector2i& newSize) { setSize(newSize.x, newSize.y); }
 
-void SpriteCharacter::bindSprite(SpriteLayer::Sprite& spriteRef) {
-    boundSpritePtr = &spriteRef;
-    configureBoundSprite(*boundSpritePtr);
+void SpriteCharacter::bindSprite(Renderer2D::SpriteHandle spriteRef) {
+    boundSpritePtr = spriteRef;
+    configureBoundSprite(boundSpritePtr);
     Position pos = getPosition();
-    boundSpritePtr->active = true;
-    boundSpritePtr->setPosition(pos.x, pos.y);
+    boundSpritePtr.setActive(true);
+    boundSpritePtr.setPosition(pos.x, pos.y);
 }
 
-SpriteLayer::Sprite* SpriteCharacter::boundSprite() { return boundSpritePtr; }
+Renderer2D::SpriteHandle& SpriteCharacter::boundSprite() { return boundSpritePtr; }
 
-const SpriteLayer::Sprite* SpriteCharacter::boundSprite() const { return boundSpritePtr; }
+const Renderer2D::SpriteHandle& SpriteCharacter::boundSprite() const { return boundSpritePtr; }
 
 void SpriteCharacter::didSetPosition() {
-    if (!boundSpritePtr) {
+    if (!boundSpritePtr.isBound()) {
         return;
     }
     Position pos = getPosition();
-    boundSpritePtr->active = true;
-    boundSpritePtr->setPosition(pos.x, pos.y);
+    boundSpritePtr.setActive(true);
+    boundSpritePtr.setPosition(pos.x, pos.y);
 }
