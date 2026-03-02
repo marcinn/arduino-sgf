@@ -10,3 +10,11 @@ void CharacterBody::setPosition(int newX, int newY) {
     posX = newX;
     posY = newY;
 }
+
+Vector2f CharacterBody::getCollisionPosition() const { return Vector2f{getPosition()}; }
+
+CollisionShape CharacterBody::getCollisionShape() const { return collisionShape; }
+
+void CharacterBody::setCollisionShape(const CollisionShape& collisionShapeValue) {
+    collisionShape = collisionShapeValue;
+}

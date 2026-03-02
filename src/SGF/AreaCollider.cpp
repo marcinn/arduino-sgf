@@ -1,5 +1,7 @@
 #include "AreaCollider.h"
 
+#include "ColliderCollision.h"
+#include "CollisionShape.h"
 #include "Physics.h"
 
 AreaCollider::AreaCollider() = default;
@@ -66,34 +68,72 @@ void AreaCollider::setBottomResponse(float restitution, bool enabled, bool setOn
 
 void AreaCollider::setCalculateResponseFn(CalculateResponseFn fn) { calculateResponseFn = fn; }
 
-bool AreaCollider::resolve(RigidBody& body) const {
-    Vector2f position = body.getPosition();
-    bool collided = false;
-    bool setOnFloor = false;
+bool AreaCollider::isColliding(const ICollidable& collidable) const {
+    return getCollision(collidable).isColliding();
+}
 
-    if (position.x < minCollisionBounds.x) {
-        collided |= resolveEdge(body, EDGE_LEFT, &position.x, minCollisionBounds.x,
-                                Vector2f{1.0f, 0.0f}, leftResponse, &setOnFloor);
-    } else if (position.x > maxCollisionBounds.x) {
-        collided |= resolveEdge(body, EDGE_RIGHT, &position.x, maxCollisionBounds.x,
-                                Vector2f{-1.0f, 0.0f}, rightResponse, &setOnFloor);
+ColliderCollision AreaCollider::getCollision(const ICollidable& collidable) const {
+    ColliderCollision collision;
+    Vector2f position = collidable.getCollisionPosition();
+    CollisionShape collisionShape = collidable.getCollisionShape();
+    Vector2f minPosition = position;
+    Vector2f maxPosition = position;
+
+    if (collisionShape.type() == CollisionShapeType::Rect) {
+        Vector2f halfSize = Vector2f{collisionShape.size()} / 2.0f;
+        minPosition = position - halfSize;
+        maxPosition = position + halfSize;
+    } else if (collisionShape.type() == CollisionShapeType::Circle) {
+        float radius = (float)collisionShape.radius();
+        minPosition = position - Vector2f{radius, radius};
+        maxPosition = position + Vector2f{radius, radius};
     }
 
-    if (position.y < minCollisionBounds.y) {
-        collided |= resolveEdge(body, EDGE_TOP, &position.y, minCollisionBounds.y,
-                                Vector2f{0.0f, 1.0f}, topResponse, &setOnFloor);
-    } else if (position.y > maxCollisionBounds.y) {
-        collided |= resolveEdge(body, EDGE_BOTTOM, &position.y, maxCollisionBounds.y,
-                                Vector2f{0.0f, -1.0f}, bottomResponse, &setOnFloor);
+    if (minPosition.x < minCollisionBounds.x) {
+        collision.setColliding(true);
+        collision.setPosition(
+            Vector2f{position.x + (minCollisionBounds.x - minPosition.x), position.y});
+        collision.setNormal(Vector2f{1.0f, 0.0f});
+        return collision;
     }
-
-    if (!collided) {
-        return false;
+    if (maxPosition.x > maxCollisionBounds.x) {
+        collision.setColliding(true);
+        collision.setPosition(
+            Vector2f{position.x - (maxPosition.x - maxCollisionBounds.x), position.y});
+        collision.setNormal(Vector2f{-1.0f, 0.0f});
+        return collision;
     }
+    if (minPosition.y < minCollisionBounds.y) {
+        collision.setColliding(true);
+        collision.setPosition(
+            Vector2f{position.x, position.y + (minCollisionBounds.y - minPosition.y)});
+        collision.setNormal(Vector2f{0.0f, 1.0f});
+        return collision;
+    }
+    if (maxPosition.y > maxCollisionBounds.y) {
+        collision.setColliding(true);
+        collision.setPosition(
+            Vector2f{position.x, position.y - (maxPosition.y - maxCollisionBounds.y)});
+        collision.setNormal(Vector2f{0.0f, -1.0f});
+        return collision;
+    }
+    return collision;
+}
 
-    body.setPosition(position);
-    body.setOnFloor(setOnFloor);
-    return true;
+void AreaCollider::resolve(RigidBody& body) const {
+    ColliderCollision collision = getCollision(body);
+    if (!collision.isColliding()) {
+        return;
+    }
+    body.setPosition(collision.position());
+    Physics::bounce(body, collision.normal(), collision.normal() == Vector2f{1.0f, 0.0f}
+                                                 ? leftResponse.restitution
+                                                 : collision.normal() == Vector2f{-1.0f, 0.0f}
+                                                       ? rightResponse.restitution
+                                                       : collision.normal() == Vector2f{0.0f, 1.0f}
+                                                             ? topResponse.restitution
+                                                             : bottomResponse.restitution);
+    body.setOnFloor(collision.normal() == Vector2f{0.0f, -1.0f} && bottomResponse.setOnFloor);
 }
 
 void AreaCollider::sanitizeResponse(EdgeResponse* response) {

@@ -1,8 +1,10 @@
 #pragma once
 
+#include "CollisionShape.h"
+#include "ICollidable.h"
 #include "Vector2.h"
 
-class RigidBody {
+class RigidBody : public ICollidable {
    public:
     using Position = Vector2f;
     using Velocity = Vector2f;
@@ -23,6 +25,10 @@ class RigidBody {
 
     float getMass() const;
     void setMass(float massValue);
+
+    Vector2f getCollisionPosition() const override;
+    CollisionShape getCollisionShape() const;
+    void setCollisionShape(const CollisionShape& collisionShapeValue);
 
     void applyCentralForce(const Vector2i& force);
     void applyCentralForce(const Vector2f& force);
@@ -45,5 +51,6 @@ class RigidBody {
     float linearDamp = 0.0f;
     float floorDamp = 0.0f;
     float mass = 1.0f;
+    CollisionShape collisionShape{};
     bool onFloor = false;
 };

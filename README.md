@@ -13,7 +13,7 @@ SGF is a lightweight C++ support library for small embedded games. It provides t
 - **DirtyRects**: Simple registry of rectangles to refresh, with clip/merge helpers to reduce overdraw.
 - **Collision**: Low-level geometry helpers using `Vector2i` inputs (`aabbHit`, `circleRectHit`, `raycastToRect`, etc.).
 - **RigidBody / Physics**: `RigidBody` stores position, velocity, mass, forces, and `linearDamp`. `Physics` integrates motion, applies gravity, and can reflect velocity with `bounce(...)`; collision detection / clamping stays outside `Physics`.
-- **AreaCollider**: Simple world-bounds collider with per-edge response. It clamps a `RigidBody` to an area, uses `Physics::bounce(...)` on contacted edges, can mark floor contact on the bottom edge, and can optionally adjust the edge response through a callback.
+- **ICollidable / ICollider / Tile colliders**: `ICollidable` provides collision position + shape. `ICollider` exposes `isColliding(...)`, `getCollision(...)`, and `resolve(RigidBody&)`. `AreaCollider` handles world bounds with per-edge response. `CharTileCollider` is the byte-per-tile variant and `BitTileCollider` is the bit-per-tile variant for tightly packed tile maps.
 - **Color565**: RGB565 helpers (`Color565::rgb(...)`, `Color565::lighten(...)`, `Color565::darken(...)`, `Color565::bswap(...)`).
 - **FastILI9341**: Display driver for ILI9341 (blitting, backlight control, rotation).
 - **Platform bus adapters**: Keep hardware/platform-specific `IDisplayBus` implementations in separate libraries such as `SGF_ESP32` or `SGF_ArduinoQ`, then include them explicitly from the sketch.
@@ -35,6 +35,9 @@ SGF is a lightweight C++ support library for small embedded games. It provides t
 - `Physics::bounce(...)` only reflects velocity along a supplied collision normal; it does not clamp position or detect collisions.
 - `AreaCollider::resolve(...)` is one simple way to clamp a body to world bounds and then invoke `Physics::bounce(...)`.
 - `AreaCollider` supports separate left/right/top/bottom restitution and an optional `calculateResponse` callback to override the final edge response.
+- `CharTileCollider` and `BitTileCollider` are collider hooks for tile-based worlds; both take a tile buffer, tile-map size, and raster bounds, then expose the same `resolve(RigidBody&)` entrypoint through `ICollider`.
+- `CharTileCollider` decides solidity through `checkTileCollisionFn(uint8_t tile)`.
+- `getCollision(...)` returns a `ColliderCollision` with corrected position, collision normal, tile coordinates, tile index, and buffer/bit offsets where applicable.
 - World/tile collision response should resolve penetration separately, then optionally call `Physics::bounce(...)`.
 
 ## Text Rendering

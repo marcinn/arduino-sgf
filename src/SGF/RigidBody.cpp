@@ -39,6 +39,14 @@ void RigidBody::setMass(float massValue) {
     mass = massValue > 0.0f ? massValue : 1.0f;
 }
 
+Vector2f RigidBody::getCollisionPosition() const { return position; }
+
+CollisionShape RigidBody::getCollisionShape() const { return collisionShape; }
+
+void RigidBody::setCollisionShape(const CollisionShape& collisionShapeValue) {
+    collisionShape = collisionShapeValue;
+}
+
 void RigidBody::applyCentralForce(const Vector2i& force) {
     applyCentralForce(Vector2f{force});
 }

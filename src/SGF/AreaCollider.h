@@ -1,9 +1,10 @@
 #pragma once
 
+#include "ICollider.h"
 #include "RigidBody.h"
 #include "Vector2.h"
 
-class AreaCollider {
+class AreaCollider : public ICollider {
    public:
     static constexpr int EDGE_LEFT = 0;
     static constexpr int EDGE_RIGHT = 1;
@@ -34,7 +35,9 @@ class AreaCollider {
     void setBottomResponse(float restitution, bool enabled = true, bool setOnFloor = true);
     void setCalculateResponseFn(CalculateResponseFn fn);
 
-    bool resolve(RigidBody& body) const;
+    bool isColliding(const ICollidable& collidable) const override;
+    ColliderCollision getCollision(const ICollidable& collidable) const override;
+    void resolve(RigidBody& body) const override;
 
    private:
     struct EdgeResponse {
