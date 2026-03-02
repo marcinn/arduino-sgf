@@ -9,6 +9,11 @@ void ActionState::reset() {
   previousPressed = currentPressed = false;
 }
 
+void ActionState::sync(bool activeNow) {
+  previousPressed = activeNow;
+  currentPressed = activeNow;
+}
+
 bool ActionState::isPressed() const {
   return currentPressed;
 }

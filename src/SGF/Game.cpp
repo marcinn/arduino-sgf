@@ -65,6 +65,13 @@ bool Game::hasCurrentScene() const {
     return sceneSwitcher && sceneSwitcher->hasCurrent();
 }
 
+void Game::resetActions() {
+    for (size_t i = 0; i < actionBindingCount; ++i) {
+        actionBindings[i].input.update();
+        actionBindings[i].state.sync(actionBindings[i].input.isActive());
+    }
+}
+
 void Game::configureActions(const ActionBinding* bindings, size_t count) {
     actionBindings = bindings;
     actionBindingCount = count;

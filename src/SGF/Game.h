@@ -23,6 +23,7 @@ class Game {
     void switchScene(Scene& scene);
     const Scene* currentScene() const;
     bool hasCurrentScene() const;
+    void resetActions();
 
     protected:
     virtual void onSetup() = 0;

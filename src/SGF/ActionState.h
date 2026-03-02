@@ -6,6 +6,7 @@ class ActionState {
 public:
   void update(bool activeNow);
   void reset();
+  void sync(bool activeNow);
 
   bool isPressed() const;
   bool isJustPressed() const;
