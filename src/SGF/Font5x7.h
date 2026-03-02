@@ -19,8 +19,8 @@ bool textPixel(const char* s, int scale, int x, int y);
 void drawText(int x, int y, const char* s, int scale, uint16_t color565, IFillRect& fillRect);
 void drawTextBlock(int anchorX, int y, const char* s, int scale, uint16_t color565, AlignX align,
                    IFillRect& fillRect);
-void drawCenteredText(int screenW, int y, const char* s, int scale, uint16_t color565,
-                      IFillRect& fillRect);
+void drawCenteredText(IFillRect& fillRect, int areaWidth, int y, const char* s, int scale,
+                      uint16_t color565);
 void drawCenteredText(IScreen& screen, int y, const char* s, int scale, uint16_t color565);
 
 }  // namespace Font5x7

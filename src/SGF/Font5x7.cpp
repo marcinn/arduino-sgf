@@ -197,15 +197,15 @@ void drawTextBlock(int anchorX, int y, const char* s, int scale, uint16_t color5
     drawText(alignedTextX(anchorX, s, scale, align), y, s, scale, color565, fillRect);
 }
 
-void drawCenteredText(int screenW, int y, const char* s, int scale, uint16_t color565,
-                      IFillRect& fillRect) {
+void drawCenteredText(IFillRect& fillRect, int areaWidth, int y, const char* s, int scale,
+                      uint16_t color565) {
     int w = textWidth(s, scale);
-    int x = (screenW - w) / 2;
+    int x = (areaWidth - w) / 2;
     drawText(x, y, s, scale, color565, fillRect);
 }
 
 void drawCenteredText(IScreen& screen, int y, const char* s, int scale, uint16_t color565) {
-    drawCenteredText(screen.size().x, y, s, scale, color565, screen);
+    drawCenteredText(screen, screen.size().x, y, s, scale, color565);
 }
 
 }  // namespace Font5x7
