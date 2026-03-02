@@ -9,7 +9,8 @@
 #include "IRenderer.h"
 #include "IRenderTarget.h"
 #include "Scroller.h"
-#include "Sprites.h"
+#include "Sprite.h"
+#include "SpriteLayer.h"
 #include "TileFlusher.h"
 
 // Renderer2D facade that combines hardware scroll, background redraw,
@@ -29,7 +30,7 @@ class Renderer2D : public IRenderer {
             sprite->setAnchor(anchor);
         }
 
-        void setScale(SpriteLayer::Scale newScale) {
+        void setScale(SpriteScale newScale) {
             if (!sprite) {
                 return;
             }
@@ -75,9 +76,9 @@ class Renderer2D : public IRenderer {
        private:
         friend class Renderer2D;
 
-        explicit SpriteHandle(SpriteLayer::Sprite* sprite) : sprite(sprite) {}
+        explicit SpriteHandle(Sprite* sprite) : sprite(sprite) {}
 
-        SpriteLayer::Sprite* sprite = nullptr;
+        Sprite* sprite = nullptr;
     };
 
     using BackgroundFn = std::function<void(int x0, int y0, int w, int h, int32_t worldX0,
@@ -138,9 +139,9 @@ class Renderer2D : public IRenderer {
         Rect bounds{0, 0, 0, 0};
         uint32_t redrawRevision = 0;
     };
-    std::array<SpriteSnapshot, SpriteLayer::kMaxSprites> spriteSnapshots{};
+    std::array<SpriteSnapshot, SpriteLayer::MAX_SPRITES> spriteSnapshots{};
 
     void addSpriteGhosts(int delta);
     void trackSpriteChanges();
-    static void spriteBounds(const SpriteLayer::Sprite& s, Rect* out);
+    static void spriteBounds(const Sprite& s, Rect* out);
 };

@@ -9,7 +9,7 @@ SGF is a lightweight C++ support library for small embedded games. It provides t
 - **IRenderTarget**: Minimal interface for render targets (`size()`, `blit565(...)`) to decouple flushing from concrete display drivers.
 - **TileFlusher**: Tile-based dirty-rect flusher. Takes `DirtyRects`, an `IRenderTarget`, and a tile render callback to repaint only modified regions in bounded tiles.
 - **Sprites**: Software sprite layer with fixed slots (sprites + missiles), transparent key, and simple horizontal scaling modes; intended to be composed over a background buffer.
-- **SpriteCharacter / SpriteRigidBody**: Small helpers that bind a `SpriteLayer::Sprite` to a `Character` or `RigidBody` and keep sprite position in sync with object position.
+- **SpriteCharacter / SpriteRigidBody**: Small helpers that bind a renderer sprite handle to a `Character` or `RigidBody` and keep sprite position in sync with object position.
 - **DirtyRects**: Simple registry of rectangles to refresh, with clip/merge helpers to reduce overdraw.
 - **Collision**: Collision helpers, including circle-rectangle intersection.
 - **Color565**: RGB565 helpers (`Color565::rgb(...)`, `Color565::lighten(...)`, `Color565::darken(...)`, `Color565::bswap(...)`).

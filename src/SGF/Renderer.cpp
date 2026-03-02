@@ -198,9 +198,11 @@ void Renderer2D::addSpriteGhosts(int delta) {
     const bool alongY = scroller.scrollsAlongY();
     const int screenShift = -delta;
     constexpr int ghostPad = 1;  // Covers edge pixels at tile/sprite boundaries.
-    for (int i = 0; i < SpriteLayer::kMaxSprites; ++i) {
+    for (int i = 0; i < SpriteLayer::MAX_SPRITES; ++i) {
         const auto& s = sprites.sprite(i);
-        if (!s.active) continue;
+        if (!s.isActive()) {
+            continue;
+        }
         Rect r;
         spriteBounds(s, &r);
         r.x0 -= ghostPad;
@@ -223,10 +225,10 @@ void Renderer2D::addSpriteGhosts(int delta) {
 }
 
 void Renderer2D::trackSpriteChanges() {
-    for (int i = 0; i < SpriteLayer::kMaxSprites; ++i) {
+    for (int i = 0; i < SpriteLayer::MAX_SPRITES; ++i) {
         const auto& s = sprites.sprite(i);
         Rect cur{};
-        const bool curActive = s.active;
+        const bool curActive = s.isActive();
         const uint32_t curRedrawRevision = s.redrawRevision();
         if (curActive) {
             spriteBounds(s, &cur);
@@ -302,6 +304,6 @@ void Renderer2D::flush(uint16_t* regionBuf) {
     });
 }
 
-void Renderer2D::spriteBounds(const SpriteLayer::Sprite& s, Rect* out) {
+void Renderer2D::spriteBounds(const Sprite& s, Rect* out) {
     SpriteLayer::spriteBounds(s, &out->x0, &out->y0, &out->x1, &out->y1);
 }
