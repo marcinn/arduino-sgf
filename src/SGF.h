@@ -15,6 +15,7 @@
 #include "SGF/IDisplayBus.h"
 #include "SGF/IFillRect.h"
 #include "SGF/IRenderTarget.h"
+#include "SGF/IRenderer.h"
 #include "SGF/IInput.h"
 #include "SGF/IScreen.h"
 #include "SGF/InputPin.h"

@@ -6,6 +6,7 @@
 #include "ActionState.h"
 #include "ActionBinding.h"
 #include "InputEvent.h"
+#include "IRenderer.h"
 #include "SceneSwitcher.h"
 
 class Scene;
@@ -31,6 +32,7 @@ class Game {
     virtual void onInput(const InputEvent& event) {}
 
     void configureActions(const ActionBinding* bindings, size_t count);
+    void attachRenderer(IRenderer& renderer) { this->renderer = &renderer; }
     const InputEvent& inputEvent() const { return currentInputEvent; }
 
     private:
@@ -44,6 +46,7 @@ class Game {
     const ActionBinding* actionBindings = nullptr;
     size_t actionBindingCount = 0;
     InputEvent currentInputEvent;
+    IRenderer* renderer = nullptr;
     SceneSwitcher sceneSwitcher;
 
     void resetClock();

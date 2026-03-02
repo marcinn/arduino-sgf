@@ -25,6 +25,9 @@ void Game::loop() {
     sceneSwitcher.onPhysics(delta);
     onProcess(delta);
     sceneSwitcher.onProcess(delta);
+    if (renderer) {
+        renderer->render();
+    }
 }
 
 void Game::resetClock() {

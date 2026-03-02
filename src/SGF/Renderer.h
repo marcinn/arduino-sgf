@@ -6,6 +6,7 @@
 #include <functional>
 
 #include "DirtyRects.h"
+#include "IRenderer.h"
 #include "IRenderTarget.h"
 #include "Scroller.h"
 #include "Sprites.h"
@@ -13,7 +14,7 @@
 
 // Renderer2D facade that combines hardware scroll, background redraw,
 // sprite overlay, and dirty-tile flushing.
-class Renderer2D {
+class Renderer2D : public IRenderer {
    public:
     using BackgroundFn = std::function<void(int x0, int y0, int w, int h, int32_t worldX0,
                                             int32_t worldY0, uint16_t* buf)>;
@@ -32,6 +33,7 @@ class Renderer2D {
 
     void setBackgroundRenderer(const BackgroundFn& fn) { bgFn = fn; }
     void setStripRenderer(const StripFn& fn) { stripFn = fn; }
+    void setRegionBuffer(uint16_t* buffer) { regionBuf = buffer; }
 
     // Scrolls the background by `delta` pixels on the active scroll axis and adds
     // dirty rects to clean sprite ghosts caused by the hardware scroll.
@@ -53,6 +55,7 @@ class Renderer2D {
     // Flushes dirty rects: background render -> sprite overlay -> blit.
     // `regionBuf` must contain at least tileW*tileH pixels.
     void flush(uint16_t* regionBuf);
+    void render() override { flush(regionBuf); }
 
    private:
     IRenderTarget& target;
@@ -62,6 +65,7 @@ class Renderer2D {
     TileFlusher flusher;
     BackgroundFn bgFn{};
     StripFn stripFn{};
+    uint16_t* regionBuf = nullptr;
     int tileW;
     int tileH;
     int32_t scrollAccumMilliPx = 0;  // signed accumulator: px*ms/s remainder in [-999, 999]
