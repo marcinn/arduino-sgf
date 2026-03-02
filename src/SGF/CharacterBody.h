@@ -11,8 +11,10 @@ class CharacterBody : public ICollidable {
     virtual ~CharacterBody();
 
     Vector2i getPosition() const;
-    void setPosition(const Position& pos);
-    void setPosition(int newX, int newY);
+    virtual void setPosition(const Position& pos);
+    virtual void setPosition(int newX, int newY);
+    Vector2f anchor() const;
+    virtual void setAnchor(const Vector2f& newAnchor);
 
     Vector2f getCollisionPosition() const override;
     CollisionShape getCollisionShape() const override;
@@ -21,5 +23,6 @@ class CharacterBody : public ICollidable {
    private:
     int posX = 0;
     int posY = 0;
+    Vector2f bodyAnchor{};
     CollisionShape collisionShape{};
 };

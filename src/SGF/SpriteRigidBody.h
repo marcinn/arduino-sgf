@@ -9,6 +9,7 @@ class SpriteRigidBody : public RigidBody {
 
     void bindSprite(Renderer2D::SpriteHandle spriteRef);
     void redrawSprite();
+    void setAnchor(const Vector2f& newAnchor) override;
     void setPosition(const Vector2f& position) override;
 
    protected:

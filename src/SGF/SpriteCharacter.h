@@ -8,6 +8,9 @@ class SpriteCharacter : public CharacterBody {
     Vector2i getSize() const;
     void setSize(int w, int h);
     void setSize(const Vector2i& newSize);
+    void setPosition(const Position& pos) override;
+    void setPosition(int newX, int newY) override;
+    void setAnchor(const Vector2f& newAnchor) override;
     void bindSprite(Renderer2D::SpriteHandle spriteRef);
 
    protected:

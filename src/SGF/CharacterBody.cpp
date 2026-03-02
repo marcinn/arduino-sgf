@@ -11,7 +11,26 @@ void CharacterBody::setPosition(int newX, int newY) {
     posY = newY;
 }
 
-Vector2f CharacterBody::getCollisionPosition() const { return Vector2f{getPosition()}; }
+Vector2f CharacterBody::anchor() const { return bodyAnchor; }
+
+void CharacterBody::setAnchor(const Vector2f& newAnchor) { bodyAnchor = newAnchor; }
+
+Vector2f CharacterBody::getCollisionPosition() const {
+    Vector2f position = Vector2f{getPosition()};
+    if (collisionShape.type() == CollisionShapeType::Point) {
+        return position;
+    }
+
+    Vector2f size{};
+    if (collisionShape.type() == CollisionShapeType::Rect) {
+        size = Vector2f{collisionShape.size()};
+    } else if (collisionShape.type() == CollisionShapeType::Circle) {
+        float diameter = (float)(collisionShape.radius() * 2);
+        size = Vector2f{diameter, diameter};
+    }
+
+    return position + ((Vector2f{0.5f, 0.5f} - bodyAnchor) * size);
+}
 
 CollisionShape CharacterBody::getCollisionShape() const { return collisionShape; }
 

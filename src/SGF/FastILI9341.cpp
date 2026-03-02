@@ -163,26 +163,20 @@ void FastILI9341::updateDimensions(uint8_t madctl) {
 }
 
 void FastILI9341::fillScreen565(uint16_t color565) {
-    // Stream byte-swapped RGB565 (ILI9341 expects big-endian words).
-    uint16_t c = Color565::bswap(color565);
+    uint16_t color = Color565::bswap(color565);
 
-    // Temporary strip buffer: maxWidth * 10 rows.
-    static constexpr int STRIP_H = 10;
-    static uint16_t strip[W * STRIP_H];
-
-    for (int i = 0; i < W * STRIP_H; i++) strip[i] = c;
-
-    for (int y = 0; y < curH; y += STRIP_H) {
-        int h = (y + STRIP_H <= curH) ? STRIP_H : (curH - y);
-        setWindow(0, y, curW - 1, y + h - 1);
-        streamBegin();
-        bus.writeDataChunk((const uint8_t*)strip, (size_t)(curW * h * 2));
-        streamEnd();
+    setWindow(0, 0, curW - 1, curH - 1);
+    streamBegin();
+    for (int i = 0; i < curW * curH; i++) {
+        bus.writeDataChunk((const uint8_t*)&color, sizeof(color));
     }
+    streamEnd();
 }
 
 void FastILI9341::fillRect565(int x0, int y0, int w, int h, uint16_t color565) {
-    if (w <= 0 || h <= 0) return;
+    if (w <= 0 || h <= 0) {
+        return;
+    }
 
     if (x0 < 0) {
         w += x0;
@@ -192,37 +186,38 @@ void FastILI9341::fillRect565(int x0, int y0, int w, int h, uint16_t color565) {
         h += y0;
         y0 = 0;
     }
-    if (x0 >= curW || y0 >= curH) return;
-    if (x0 + w > curW) w = curW - x0;
-    if (y0 + h > curH) h = curH - y0;
-    if (w <= 0 || h <= 0) return;
-
-    static constexpr int MAX_RW = 120;
-    static constexpr int MAX_RH = 80;
-    static uint16_t rectBuf[MAX_RW * MAX_RH];
-
-    for (int ty = 0; ty < h; ty += MAX_RH) {
-        int hh = min(MAX_RH, h - ty);
-        for (int tx = 0; tx < w; tx += MAX_RW) {
-            int ww = min(MAX_RW, w - tx);
-            int n = ww * hh;
-            for (int i = 0; i < n; i++) rectBuf[i] = color565;
-            blit565(x0 + tx, y0 + ty, ww, hh, rectBuf);
-        }
+    if (x0 >= curW || y0 >= curH) {
+        return;
     }
+    if (x0 + w > curW) {
+        w = curW - x0;
+    }
+    if (y0 + h > curH) {
+        h = curH - y0;
+    }
+    if (w <= 0 || h <= 0) {
+        return;
+    }
+
+    uint16_t color = Color565::bswap(color565);
+    setWindow(x0, y0, x0 + w - 1, y0 + h - 1);
+    streamBegin();
+    for (int i = 0; i < w * h; i++) {
+        bus.writeDataChunk((const uint8_t*)&color, sizeof(color));
+    }
+    streamEnd();
 }
 
 void FastILI9341::blit565(int x0, int y0, int w, int h, const uint16_t* pix) {
-    if (w <= 0 || h <= 0) return;
-
-    // ILI9341 expects big-endian words. Convert into a temporary swapped buffer.
-    // Maximum size is constrained by caller-side dirty/tile dimensions.
-    static uint16_t tmp[120 * 80];  // Keep in sync with typical region/tile limits.
-    const int n = w * h;
-    for (int i = 0; i < n; i++) tmp[i] = Color565::bswap(pix[i]);
+    if (w <= 0 || h <= 0) {
+        return;
+    }
 
     setWindow(x0, y0, x0 + w - 1, y0 + h - 1);
     streamBegin();
-    bus.writeDataChunk((const uint8_t*)tmp, (size_t)(n * 2));
+    for (int i = 0; i < w * h; i++) {
+        uint16_t swapped = Color565::bswap(pix[i]);
+        bus.writeDataChunk((const uint8_t*)&swapped, sizeof(swapped));
+    }
     streamEnd();
 }

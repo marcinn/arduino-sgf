@@ -10,6 +10,10 @@ void RigidBody::setPosition(const Vector2f& position) {
     this->position = position;
 }
 
+Vector2f RigidBody::anchor() const { return bodyAnchor; }
+
+void RigidBody::setAnchor(const Vector2f& newAnchor) { bodyAnchor = newAnchor; }
+
 Vector2f RigidBody::getVelocity() const { return velocity; }
 
 void RigidBody::setVelocity(const Vector2i& velocity) {
@@ -39,7 +43,21 @@ void RigidBody::setMass(float massValue) {
     mass = massValue > 0.0f ? massValue : 1.0f;
 }
 
-Vector2f RigidBody::getCollisionPosition() const { return position; }
+Vector2f RigidBody::getCollisionPosition() const {
+    if (collisionShape.type() == CollisionShapeType::Point) {
+        return position;
+    }
+
+    Vector2f size{};
+    if (collisionShape.type() == CollisionShapeType::Rect) {
+        size = Vector2f{collisionShape.size()};
+    } else if (collisionShape.type() == CollisionShapeType::Circle) {
+        float diameter = (float)(collisionShape.radius() * 2);
+        size = Vector2f{diameter, diameter};
+    }
+
+    return position + ((Vector2f{0.5f, 0.5f} - bodyAnchor) * size);
+}
 
 CollisionShape RigidBody::getCollisionShape() const { return collisionShape; }
 

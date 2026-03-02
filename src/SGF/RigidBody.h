@@ -12,6 +12,8 @@ class RigidBody : public ICollidable {
     Vector2f getPosition() const;
     void setPosition(const Vector2i& position);
     virtual void setPosition(const Vector2f& position);
+    Vector2f anchor() const;
+    virtual void setAnchor(const Vector2f& newAnchor);
 
     Vector2f getVelocity() const;
     void setVelocity(const Vector2i& velocity);
@@ -46,6 +48,7 @@ class RigidBody : public ICollidable {
     friend class Physics;
 
     Vector2f position{};
+    Vector2f bodyAnchor{};
     Vector2f velocity{};
     Vector2f accumulatedForce{};
     float linearDamp = 0.0f;
