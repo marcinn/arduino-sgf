@@ -16,6 +16,13 @@ void Physics::integrate(RigidBody& body, float delta) {
         }
         velocity *= dampFactor;
     }
+    if (body.isOnFloor() && body.getFloorDamp() > 0.0f) {
+        float dampFactor = 1.0f - (body.getFloorDamp() * delta);
+        if (dampFactor < 0.0f) {
+            dampFactor = 0.0f;
+        }
+        velocity *= dampFactor;
+    }
     body.setVelocity(velocity);
     body.setPosition(body.getPosition() + velocity * delta);
     body.setOnFloor(false);

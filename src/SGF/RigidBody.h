@@ -18,6 +18,9 @@ class RigidBody {
     float getLinearDamp() const;
     void setLinearDamp(float linearDampValue);
 
+    float getFloorDamp() const;
+    void setFloorDamp(float floorDampValue);
+
     float getMass() const;
     void setMass(float massValue);
 
@@ -40,6 +43,7 @@ class RigidBody {
     Vector2f velocity{};
     Vector2f accumulatedForce{};
     float linearDamp = 0.0f;
+    float floorDamp = 0.0f;
     float mass = 1.0f;
     bool onFloor = false;
 };

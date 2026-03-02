@@ -27,6 +27,12 @@ void RigidBody::setLinearDamp(float linearDampValue) {
     linearDamp = linearDampValue >= 0.0f ? linearDampValue : 0.0f;
 }
 
+float RigidBody::getFloorDamp() const { return floorDamp; }
+
+void RigidBody::setFloorDamp(float floorDampValue) {
+    floorDamp = floorDampValue >= 0.0f ? floorDampValue : 0.0f;
+}
+
 float RigidBody::getMass() const { return mass; }
 
 void RigidBody::setMass(float massValue) {
