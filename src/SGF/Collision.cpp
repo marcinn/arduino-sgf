@@ -77,6 +77,32 @@ Vector2f normalFromPointToRect(const Vector2f& point, const Vector2i& rectMin,
     }
     return normal;
 }
+
+Vector2f normalFromCircleToRect(const Vector2f& center, const Vector2i& rectMin,
+                                const Vector2i& rectMax) {
+    float nearestX = center.x;
+    if (nearestX < rectMin.x) {
+        nearestX = (float)rectMin.x;
+    } else if (nearestX > rectMax.x) {
+        nearestX = (float)rectMax.x;
+    }
+
+    float nearestY = center.y;
+    if (nearestY < rectMin.y) {
+        nearestY = (float)rectMin.y;
+    } else if (nearestY > rectMax.y) {
+        nearestY = (float)rectMax.y;
+    }
+
+    Vector2f delta = center - Vector2f{nearestX, nearestY};
+    float lengthSq = delta.x * delta.x + delta.y * delta.y;
+    if (lengthSq > 0.0f) {
+        float length = sqrtf(lengthSq);
+        return delta / length;
+    }
+
+    return normalFromPointToRect(center, rectMin, rectMax);
+}
 }  // namespace
 
 bool circleRectHit(const Vector2i& center, int radius, const Vector2i& rectMin,
@@ -233,8 +259,10 @@ ColliderCollision collidablesCollision(const ICollidable& first, const ICollidab
             return collision;
         }
         collision.setColliding(true);
-        collision.setPosition(firstPosition);
-        collision.setNormal(normalFromPointToRect(firstPosition, secondMin, secondMax));
+        Vector2f normal = normalFromCircleToRect(firstPosition, secondMin, secondMax);
+        float radius = (float)firstShape.radius();
+        collision.setPosition(firstPosition - (normal * radius));
+        collision.setNormal(normal);
         return collision;
     }
 

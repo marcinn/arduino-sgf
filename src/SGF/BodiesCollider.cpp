@@ -50,8 +50,8 @@ void resolveRigidAgainstStatic(RigidBody& rigidBody, const ICollidable& other, f
 
     float normalLength = sqrtf(normalLengthSq);
     Vector2f unitNormal = normal / normalLength;
-    float distance = supportDistance(rigidBody, unitNormal) + supportDistance(other, unitNormal);
-    Vector2f correctedCenter = other.getCollisionPosition() + (unitNormal * distance);
+    float rigidSupport = supportDistance(rigidBody, unitNormal);
+    Vector2f correctedCenter = collision.position() + (unitNormal * rigidSupport);
     rigidBody.setPosition(correctedCenter + centerToReferenceOffset(rigidBody));
     Physics::bounce(rigidBody, unitNormal, restitution);
     rigidBody.setOnFloor(unitNormal == Vector2f{0.0f, -1.0f});
