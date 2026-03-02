@@ -1,9 +1,9 @@
 #include "DebouncedInputPin.h"
 
-bool DebouncedInputPin::update() {
+void DebouncedInputPin::update() {
     bool rawNow = InputPin::isActive();
     if (rawNow == stablePressedFlag) {
-        return false;
+        return;
     }
     uint32_t nowMs = millis();
 
@@ -16,10 +16,9 @@ bool DebouncedInputPin::update() {
         uint32_t elapsed = nowMs - lastRawChangeMs;
         if (elapsed >= DEBOUNCE_INPUT_MS) {
             stablePressedFlag = lastRawPressed;
-            return true
+            return;
         }
     }
-    return false;
 }
 
 bool DebouncedInputPin::isActive() const { return stablePressedFlag; }

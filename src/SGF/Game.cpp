@@ -35,6 +35,7 @@ void Game::configureActions(const ActionBinding* bindings, size_t count) {
 
 void Game::updateActionStates() {
     for (size_t i = 0; i < actionBindingCount; ++i) {
+        actionBindings[i].input.update();
         bool value = actionBindings[i].input.isActive();
         ActionState& actionState = actionBindings[i].state;
         actionState.update(value);

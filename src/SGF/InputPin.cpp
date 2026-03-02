@@ -8,11 +8,16 @@ void InputPin::attach(uint8_t pinNumber, bool activeLow) {
     this->pinNumber = pinNumber;
     this->activeLow = activeLow;
     pinMode(pinNumber, activeLow ? INPUT_PULLUP : INPUT);
+    update();
+}
+
+void InputPin::update() {
+    int level = digitalRead(pinNumber);
+    pressed = activeLow ? (level == LOW) : (level == HIGH);
 }
 
 bool InputPin::isActive() const {
-    int level = digitalRead(pinNumber);
-    return activeLow ? (level == LOW) : (level == HIGH);
+    return pressed;
 }
 
 uint8_t InputPin::pin() const { return pinNumber; }

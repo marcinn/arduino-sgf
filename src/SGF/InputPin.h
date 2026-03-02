@@ -11,10 +11,12 @@ class InputPin : public IInput {
 
     InputPin(uint8_t pinNumber, bool activeLow = true);
     void attach(uint8_t pinNumber, bool activeLow = true);
+    void update() override;
     bool isActive() const override;
     uint8_t pin() const;
 
    private:
     uint8_t pinNumber = 0;
     bool activeLow = true;
+    bool pressed = false;
 };
