@@ -18,6 +18,18 @@ void SceneSwitcher::switchTo(Scene& scene) {
     currentScene->onEnter();
 }
 
+void SceneSwitcher::onAction(ActionState& action) {
+    if (currentScene) {
+        currentScene->onAction(action);
+    }
+}
+
+void SceneSwitcher::onInput(const InputEvent& event) {
+    if (currentScene) {
+        currentScene->onInput(event);
+    }
+}
+
 void SceneSwitcher::onPhysics(float delta) {
     if (currentScene) {
         currentScene->onPhysics(delta);
