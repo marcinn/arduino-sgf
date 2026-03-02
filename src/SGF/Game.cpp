@@ -21,48 +21,26 @@ void Game::loop() {
     updateActionStates();
     float delta = tickSeconds(micros());
     onPhysics(delta);
-    if (sceneSwitcher) {
-        sceneSwitcher->onPhysics(delta);
-    }
+    sceneSwitcher.onPhysics(delta);
     onProcess(delta);
-    if (sceneSwitcher) {
-        sceneSwitcher->onProcess(delta);
-    }
+    sceneSwitcher.onProcess(delta);
 }
 
 void Game::resetClock() {
     clock.lastUs = micros();
 }
 
-void Game::attachSceneSwitcher(SceneSwitcher& sceneSwitcher) {
-    this->sceneSwitcher = &sceneSwitcher;
-}
-
-void Game::setInitialScene(Scene& scene) {
-    if (!sceneSwitcher) {
-        return;
-    }
-    sceneSwitcher->setInitial(scene);
-    resetClock();
-}
-
 void Game::switchScene(Scene& scene) {
-    if (!sceneSwitcher) {
-        return;
-    }
-    sceneSwitcher->switchTo(scene);
+    sceneSwitcher.switchTo(scene);
     resetClock();
 }
 
 const Scene* Game::currentScene() const {
-    if (!sceneSwitcher) {
-        return nullptr;
-    }
-    return sceneSwitcher->current();
+    return sceneSwitcher.current();
 }
 
 bool Game::hasCurrentScene() const {
-    return sceneSwitcher && sceneSwitcher->hasCurrent();
+    return sceneSwitcher.hasCurrent();
 }
 
 void Game::resetActions() {
@@ -97,13 +75,9 @@ void Game::updateActionStates() {
         currentInputEvent.justPressed = actionState.isJustPressed();
         currentInputEvent.justReleased = actionState.isJustReleased();
         onAction(actionState);
-        if (sceneSwitcher) {
-            sceneSwitcher->onAction(actionState);
-        }
+        sceneSwitcher.onAction(actionState);
         onInput(currentInputEvent);
-        if (sceneSwitcher) {
-            sceneSwitcher->onInput(currentInputEvent);
-        }
+        sceneSwitcher.onInput(currentInputEvent);
     }
 }
 

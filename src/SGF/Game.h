@@ -6,9 +6,9 @@
 #include "ActionState.h"
 #include "ActionBinding.h"
 #include "InputEvent.h"
+#include "SceneSwitcher.h"
 
 class Scene;
-class SceneSwitcher;
 
 class Game {
     public:
@@ -18,8 +18,6 @@ class Game {
     void start();
     void loop();
 
-    void attachSceneSwitcher(SceneSwitcher& sceneSwitcher);
-    void setInitialScene(Scene& scene);
     void switchScene(Scene& scene);
     const Scene* currentScene() const;
     bool hasCurrentScene() const;
@@ -46,7 +44,7 @@ class Game {
     const ActionBinding* actionBindings = nullptr;
     size_t actionBindingCount = 0;
     InputEvent currentInputEvent;
-    SceneSwitcher* sceneSwitcher = nullptr;
+    SceneSwitcher sceneSwitcher;
 
     void resetClock();
     void updateActionStates();

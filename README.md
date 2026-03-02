@@ -3,8 +3,8 @@
 SGF is a lightweight C++ support library for small embedded games. It provides timing, rendering, and utility building blocks without imposing a specific engine architecture. All headers are included with the `SGF/` prefix (e.g., `#include "SGF/TileFlusher.h"`).
 
 ## Components
-- **Game**: Base loop with an internal frame clock. Exposes `start()`, `loop()`, scene helpers (`attachSceneSwitcher(...)`, `setInitialScene(...)`, `switchScene(...)`), and `resetActions()`. Derive from it and implement `onSetup()`, `onPhysics(float delta)`, and `onProcess(float delta)` to integrate your game logic and rendering.
-- **Scene** / **SceneSwitcher**: Lightweight scene interface and dispatcher for title/gameplay/game-over style flows without dynamic allocation. `Game` can delegate `onAction`, `onInput`, `onPhysics`, and `onProcess` to the active scene through an attached `SceneSwitcher`.
+- **Game**: Base loop with an internal frame clock. Exposes `start()`, `loop()`, `switchScene(...)`, and `resetActions()`. Derive from it and implement `onSetup()`, `onPhysics(float delta)`, and `onProcess(float delta)` to integrate your game logic and rendering.
+- **Scene** / **SceneSwitcher**: Lightweight scene interface and dispatcher for title/gameplay/game-over style flows without dynamic allocation. `Game` owns one `SceneSwitcher` internally and delegates `onAction`, `onInput`, `onPhysics`, and `onProcess` to the active scene.
 - **Actions**: Input state helpers built around `ActionState`, `ActionBinding`, and `InputEvent`. `Game` updates bound inputs, emits `pressed` / `justPressed` / `justReleased`, and `resetActions()` can resync action state to the current hardware snapshot without emitting edge events.
 - **IRenderTarget**: Minimal interface for render targets (`width()`, `height()`, `blit565(...)`) to decouple flushing from concrete display drivers.
 - **TileFlusher**: Tile-based dirty-rect flusher. Takes `DirtyRects`, an `IRenderTarget`, and a tile render callback to repaint only modified regions in bounded tiles.
@@ -22,7 +22,7 @@ SGF is a lightweight C++ support library for small embedded games. It provides t
 ## Typical use
 - Derive your game class from `Game`, override the three lifecycle hooks, and hold your state there.
 - Bind hardware inputs with `ActionBinding` and `configureActions(...)`; `Game` will update the bound inputs and action states each frame.
-- If you use scenes, keep a `SceneSwitcher`, attach it to the game once, then enter/switch scenes through `Game::setInitialScene(...)` and `Game::switchScene(...)`.
+- If you use scenes, let `Game` own scene dispatch and enter/switch scenes through `Game::switchScene(...)`.
 - For rendering, adapt your display to `IRenderTarget` (or use a thin adapter) and use `TileFlusher` with a game-provided region renderer to redraw dirty areas efficiently.
 - Leverage `DirtyRects` to mark updates, `Collision` for basic geometry tests, `Color565` for colors, and pair a display driver such as `FastILI9341` with a platform-specific bus adapter.
 
@@ -181,7 +181,6 @@ private:
   ActionState fireAction;
   ActionBinding actionBindings[1];
   DirtyRects dirty;
-  SceneSwitcher sceneSwitcher;
   TitleScene titleScene;
   PlayScene playScene;
 
@@ -214,12 +213,11 @@ private:
 
   void onSetup() override {
     configureActions(actionBindings, 1);
-    attachSceneSwitcher(sceneSwitcher);
 
     gfx.begin(24000000u);
     gfx.screenRotation(FastILI9341::ScreenRotation::Landscape);
     gfx.fillScreen565(Color565::rgb(0, 0, 0));
-    setInitialScene(titleScene);
+    switchScene(titleScene);
   }
 
   void onPhysics(float delta) override {
@@ -291,7 +289,7 @@ void PlayScene::onProcess(float delta) {
 Notes:
 - The host `MiniGame` owns shared state (display, input, scene switcher).
 - Scenes are regular classes with composition (`MiniGame& game`), not subclasses of the game.
-- `Game` owns frame timing and scene transitions; use `setInitialScene(...)` / `switchScene(...)` instead of touching the switcher directly from outside engine code.
+- `Game` owns frame timing and scene transitions; use `switchScene(...)` instead of touching the switcher directly from outside engine code.
 - Use `resetActions()` on scene entry when you want to ignore inherited button edges from the previous scene.
 
 ## Example: Hardware scrolling with sprites (RiverRaid-style)

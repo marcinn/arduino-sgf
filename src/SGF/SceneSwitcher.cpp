@@ -2,11 +2,6 @@
 
 #include "Scene.h"
 
-void SceneSwitcher::setInitial(Scene& scene) {
-    currentScene = &scene;
-    currentScene->onEnter();
-}
-
 void SceneSwitcher::switchTo(Scene& scene) {
     if (currentScene == &scene) {
         return;

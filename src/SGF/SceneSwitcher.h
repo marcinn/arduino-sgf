@@ -6,7 +6,6 @@ class Scene;
 
 class SceneSwitcher {
    public:
-    void setInitial(Scene& scene);
     void switchTo(Scene& scene);
     void onAction(ActionState& action);
     void onInput(const InputEvent& event);
