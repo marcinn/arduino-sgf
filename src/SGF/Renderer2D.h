@@ -144,6 +144,7 @@ class Renderer2D : public IRenderer {
     uint32_t fpsWindowStartMs = 0;
     uint16_t fpsFrameCount = 0;
     uint16_t fpsValue = 0;
+    bool fpsOverlayDirty = false;
 #endif
 
     void addSpriteGhosts(int delta);
@@ -151,7 +152,7 @@ class Renderer2D : public IRenderer {
     static void spriteBounds(const Sprite& s, Rect* out);
 #ifdef ENABLE_FPS
     void updateFps();
-    void markFpsDirty();
+    void markFpsDirty() const;
     void renderFpsOverlay(int x0, int y0, int w, int h, uint16_t* buf);
 #endif
 };

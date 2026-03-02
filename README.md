@@ -177,13 +177,15 @@ sgf info
 sgf clean board=esp32
 ```
 
-Exported `ENABLE_*` variables are forwarded as preprocessor defines. Example:
+Exported `ENABLE_*` variables are forwarded as preprocessor defines. `PHYSICS_TARGET_FPS` and `RENDER_TARGET_FPS` are also forwarded. Example:
 
 ```bash
 ENABLE_CTRL4B=1 sgf flash board=esp32 port=/dev/ttyUSB0
 ```
 
 `ENABLE_FPS=1` enables a small FPS overlay rendered by `Renderer2D` as the top-most debug layer in the normal render pipeline.
+
+`PHYSICS_TARGET_FPS` and `RENDER_TARGET_FPS` default to `60`. They cap the `Game` physics tick rate and render rate independently. Set either to `0` to disable that limit.
 
 If `arduino-cli` is bundled inside Arduino IDE and not available in `PATH`, pass the IDE root:
 

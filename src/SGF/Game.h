@@ -1,5 +1,13 @@
 #pragma once
 
+#ifndef PHYSICS_TARGET_FPS
+#define PHYSICS_TARGET_FPS 60
+#endif
+
+#ifndef RENDER_TARGET_FPS
+#define RENDER_TARGET_FPS 60
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -42,7 +50,9 @@ class Game {
         uint32_t maxStepUs;
     };
 
-    FrameClock clock;
+    FrameClock physicsClock;
+    uint32_t lastProcessUs = 0;
+    uint32_t lastRenderUs = 0;
     const ActionBinding* actionBindings = nullptr;
     size_t actionBindingCount = 0;
     InputEvent currentInputEvent;
@@ -52,4 +62,5 @@ class Game {
     void resetClock();
     void updateActionStates();
     float tickSeconds(uint32_t nowUs);
+    float processSeconds(uint32_t nowUs);
 };

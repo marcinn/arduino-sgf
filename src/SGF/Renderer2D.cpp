@@ -11,10 +11,12 @@
 
 namespace {
 #ifdef ENABLE_FPS
-constexpr int FPS_TEXT_SCALE = 1;
+constexpr int FPS_TEXT_SCALE = 2;
 constexpr int FPS_PADDING = 1;
-constexpr int FPS_OVERLAY_WIDTH = 42 + (FPS_PADDING * 2);
-constexpr int FPS_OVERLAY_HEIGHT = 7 + (FPS_PADDING * 2);
+constexpr int FPS_TEXT_WIDTH = (9 * 6 * FPS_TEXT_SCALE) - FPS_TEXT_SCALE;
+constexpr int FPS_OVERLAY_WIDTH = FPS_TEXT_WIDTH + (FPS_PADDING * 2);
+constexpr int FPS_OVERLAY_HEIGHT = (7 * FPS_TEXT_SCALE) + (FPS_PADDING * 2);
+constexpr uint32_t FPS_UPDATE_INTERVAL_MS = 500;
 #endif
 
 static void blitSubRectRows(IRenderTarget& target, int dstX, int dstY, int w, int h,
@@ -144,7 +146,10 @@ Renderer2D::Renderer2D(IRenderTarget& target, DirtyRects& dirty, int tileW, int 
 void Renderer2D::render() {
 #ifdef ENABLE_FPS
     updateFps();
-    markFpsDirty();
+    if (fpsOverlayDirty) {
+        markFpsDirty();
+        fpsOverlayDirty = false;
+    }
 #endif
     flush(regionBuf);
 }
@@ -341,16 +346,20 @@ void Renderer2D::updateFps() {
 
     fpsFrameCount++;
     uint32_t elapsed = now - fpsWindowStartMs;
-    if (elapsed < 1000u) {
+    if (elapsed < FPS_UPDATE_INTERVAL_MS) {
         return;
     }
 
-    fpsValue = (uint16_t)((fpsFrameCount * 1000u) / elapsed);
+    uint16_t newFpsValue = (uint16_t)((fpsFrameCount * 1000u) / elapsed);
+    if (newFpsValue != fpsValue) {
+        fpsValue = newFpsValue;
+        fpsOverlayDirty = true;
+    }
     fpsFrameCount = 0;
     fpsWindowStartMs = now;
 }
 
-void Renderer2D::markFpsDirty() {
+void Renderer2D::markFpsDirty() const {
     dirty.add(0, 0, FPS_OVERLAY_WIDTH - 1, FPS_OVERLAY_HEIGHT - 1);
 }
 
@@ -358,10 +367,25 @@ void Renderer2D::renderFpsOverlay(int x0, int y0, int w, int h, uint16_t* buf) {
     BufferFillRect fillRect(x0, y0, w, h, buf);
     fillRect.fillRect565(0, 0, FPS_OVERLAY_WIDTH, FPS_OVERLAY_HEIGHT, Color565::rgb(0, 0, 0));
 
-    char text[] = "FPS:000";
-    text[4] = (char)('0' + ((fpsValue / 100) % 10));
-    text[5] = (char)('0' + ((fpsValue / 10) % 10));
-    text[6] = (char)('0' + (fpsValue % 10));
+    char text[] = "FPS:     ";
+    uint16_t value = fpsValue;
+    text[8] = (char)('0' + (value % 10));
+    value /= 10;
+    if (value != 0) {
+        text[7] = (char)('0' + (value % 10));
+        value /= 10;
+    }
+    if (value != 0) {
+        text[6] = (char)('0' + (value % 10));
+        value /= 10;
+    }
+    if (value != 0) {
+        text[5] = (char)('0' + (value % 10));
+        value /= 10;
+    }
+    if (value != 0) {
+        text[4] = (char)('0' + (value % 10));
+    }
     FontRenderer::drawText(FONT_5X7, fillRect, FPS_PADDING, FPS_PADDING, text, FPS_TEXT_SCALE,
                            Color565::rgb(255, 255, 255));
 }

@@ -5,33 +5,56 @@
 #include "Scene.h"
 #include "SceneSwitcher.h"
 
+namespace {
+uint32_t frameIntervalUs(uint32_t fps) {
+    if (fps == 0) {
+        return 0;
+    }
+    return 1000000u / fps;
+}
+}  // namespace
+
 Game::Game(uint32_t defaultStepUs, uint32_t maxStepUs) {
-    clock.lastUs = 0;
-    clock.defaultStepUs = defaultStepUs;
-    clock.maxStepUs = maxStepUs;
+    physicsClock.lastUs = 0;
+    physicsClock.defaultStepUs = defaultStepUs;
+    physicsClock.maxStepUs = maxStepUs;
 }
 
 void Game::start() {
-    clock.lastUs = 0;
+    physicsClock.lastUs = 0;
+    lastProcessUs = 0;
+    lastRenderUs = 0;
     onSetup();
     resetClock();
     resetActions();
 }
 
 void Game::loop() {
-    updateActionStates();
-    float delta = tickSeconds(micros());
-    onPhysics(delta);
-    sceneSwitcher.onPhysics(delta);
-    onProcess(delta);
-    sceneSwitcher.onProcess(delta);
-    if (renderer) {
+    uint32_t nowUs = micros();
+    float processDelta = processSeconds(nowUs);
+    onProcess(processDelta);
+    sceneSwitcher.onProcess(processDelta);
+
+    uint32_t physicsInterval = frameIntervalUs(PHYSICS_TARGET_FPS);
+    if (physicsInterval == 0 || nowUs - physicsClock.lastUs >= physicsInterval) {
+        float delta = tickSeconds(nowUs);
+        updateActionStates();
+        onPhysics(delta);
+        sceneSwitcher.onPhysics(delta);
+    }
+
+    uint32_t renderInterval = frameIntervalUs(RENDER_TARGET_FPS);
+    if (renderer && (renderInterval == 0 || nowUs - lastRenderUs >= renderInterval)) {
+        lastRenderUs = nowUs;
         renderer->render();
     }
 }
 
 void Game::resetClock() {
-    clock.lastUs = micros();
+    uint32_t nowUs = micros();
+    physicsClock.lastUs = nowUs;
+    lastProcessUs = nowUs;
+    lastRenderUs = nowUs;
 }
 
 void Game::switchScene(Scene& scene) {
@@ -86,16 +109,31 @@ void Game::updateActionStates() {
 }
 
 float Game::tickSeconds(uint32_t nowUs) {
-    if (clock.lastUs == 0) {
-        clock.lastUs = nowUs;
-        return (float)clock.defaultStepUs / 1000000.0f;
+    if (physicsClock.lastUs == 0) {
+        physicsClock.lastUs = nowUs;
+        return (float)physicsClock.defaultStepUs / 1000000.0f;
     }
 
-    uint32_t dtUs = nowUs - clock.lastUs;
-    clock.lastUs = nowUs;
+    uint32_t dtUs = nowUs - physicsClock.lastUs;
+    physicsClock.lastUs = nowUs;
 
-    if (clock.maxStepUs != 0 && dtUs > clock.maxStepUs) {
-        dtUs = clock.maxStepUs;
+    if (physicsClock.maxStepUs != 0 && dtUs > physicsClock.maxStepUs) {
+        dtUs = physicsClock.maxStepUs;
+    }
+    return (float)dtUs / 1000000.0f;
+}
+
+float Game::processSeconds(uint32_t nowUs) {
+    if (lastProcessUs == 0) {
+        lastProcessUs = nowUs;
+        return (float)physicsClock.defaultStepUs / 1000000.0f;
+    }
+
+    uint32_t dtUs = nowUs - lastProcessUs;
+    lastProcessUs = nowUs;
+
+    if (physicsClock.maxStepUs != 0 && dtUs > physicsClock.maxStepUs) {
+        dtUs = physicsClock.maxStepUs;
     }
     return (float)dtUs / 1000000.0f;
 }

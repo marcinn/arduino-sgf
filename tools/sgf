@@ -299,6 +299,9 @@ resolve_env_extra_flags() {
         fi
         extra_flags="$extra_flags -D$name=$value"
         ;;
+      PHYSICS_TARGET_FPS|RENDER_TARGET_FPS)
+        extra_flags="$extra_flags -D$name=$value"
+        ;;
     esac
   done < <(env)
 
