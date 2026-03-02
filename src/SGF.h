@@ -7,6 +7,7 @@
 #include "SGF/CharTileCollider.h"
 #include "SGF/CharacterBody.h"
 #include "SGF/Collision.h"
+#include "SGF/CollisionDebug.h"
 #include "SGF/CollisionShape.h"
 #include "SGF/ColliderCollision.h"
 #include "SGF/Color565.h"

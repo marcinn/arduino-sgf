@@ -125,7 +125,8 @@ void AreaCollider::resolve(RigidBody& body) const {
     if (!collision.isColliding()) {
         return;
     }
-    body.setPosition(collision.position());
+    Vector2f collisionOffset = collision.position() - body.getCollisionPosition();
+    body.setPosition(body.getPosition() + collisionOffset);
     Physics::bounce(body, collision.normal(), collision.normal() == Vector2f{1.0f, 0.0f}
                                                  ? leftResponse.restitution
                                                  : collision.normal() == Vector2f{-1.0f, 0.0f}
