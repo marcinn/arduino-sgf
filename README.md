@@ -3,9 +3,9 @@
 SGF is a lightweight C++ support library for small embedded games. It provides timing, rendering, and utility building blocks without imposing a specific engine architecture. All headers are included with the `SGF/` prefix (e.g., `#include "SGF/TileFlusher.h"`).
 
 ## Components
-- **Game**: Base loop with an internal frame clock. Exposes `start()`, `loop()`, and `resetClock()`. Derive from it and implement `onSetup()`, `onPhysics(float delta)`, and `onProcess(float delta)` to integrate your game logic and rendering.
-- **Scene** / **SceneSwitcher**: Lightweight scene interface and dispatcher for title/gameplay/game-over style flows without dynamic allocation.
-- **Actions**: Small input helpers (`DigitalAction`, `PressReleaseAction`) for `pressed` / `justPressed` / confirm-style handling.
+- **Game**: Base loop with an internal frame clock. Exposes `start()`, `loop()`, scene helpers (`attachSceneSwitcher(...)`, `setInitialScene(...)`, `switchScene(...)`), and `resetActions()`. Derive from it and implement `onSetup()`, `onPhysics(float delta)`, and `onProcess(float delta)` to integrate your game logic and rendering.
+- **Scene** / **SceneSwitcher**: Lightweight scene interface and dispatcher for title/gameplay/game-over style flows without dynamic allocation. `Game` can delegate `onAction`, `onInput`, `onPhysics`, and `onProcess` to the active scene through an attached `SceneSwitcher`.
+- **Actions**: Input state helpers built around `ActionState`, `ActionBinding`, and `InputEvent`. `Game` updates bound inputs, emits `pressed` / `justPressed` / `justReleased`, and `resetActions()` can resync action state to the current hardware snapshot without emitting edge events.
 - **IRenderTarget**: Minimal interface for render targets (`width()`, `height()`, `blit565(...)`) to decouple flushing from concrete display drivers.
 - **TileFlusher**: Tile-based dirty-rect flusher. Takes `DirtyRects`, an `IRenderTarget`, and a tile render callback to repaint only modified regions in bounded tiles.
 - **Sprites**: Software sprite layer with fixed slots (sprites + missiles), transparent key, and simple horizontal scaling modes; intended to be composed over a background buffer.
@@ -21,6 +21,8 @@ SGF is a lightweight C++ support library for small embedded games. It provides t
 
 ## Typical use
 - Derive your game class from `Game`, override the three lifecycle hooks, and hold your state there.
+- Bind hardware inputs with `ActionBinding` and `configureActions(...)`; `Game` will update the bound inputs and action states each frame.
+- If you use scenes, keep a `SceneSwitcher`, attach it to the game once, then enter/switch scenes through `Game::setInitialScene(...)` and `Game::switchScene(...)`.
 - For rendering, adapt your display to `IRenderTarget` (or use a thin adapter) and use `TileFlusher` with a game-provided region renderer to redraw dirty areas efficiently.
 - Leverage `DirtyRects` to mark updates, `Collision` for basic geometry tests, `Color565` for colors, and pair a display driver such as `FastILI9341` with a platform-specific bus adapter.
 
@@ -113,7 +115,8 @@ Below is a minimal example showing a game host with a title scene and a play sce
 ```cpp
 #include <Arduino.h>
 #include "SGF_ArduinoQ.h"
-#include "SGF/Actions.h"
+#include "SGF/ActionBinding.h"
+#include "SGF/ActionState.h"
 #include "SGF/Color565.h"
 #include "SGF/DirtyRects.h"
 #include "SGF/Game.h"
@@ -141,6 +144,7 @@ class TitleScene : public Scene {
 public:
   explicit TitleScene(MiniGame& game) : game(game) {}
   void onEnter() override;
+  void onInput(const InputEvent& event) override;
   void onPhysics(float delta) override;
   void onProcess(float delta) override;
 
@@ -159,23 +163,13 @@ private:
   MiniGame& game;
 };
 
-class TitleScene : public Scene {
-public:
-  explicit TitleScene(MiniGame& game) : game(game) {}
-  void onEnter() override;
-  void onPhysics(float delta) override;
-  void onProcess(float delta) override;
-
-private:
-  MiniGame& game;
-};
-
 class MiniGame : public Game {
 public:
   MiniGame(FastILI9341& gfx, uint8_t firePin)
     : Game(10000u, 30000u),
       gfx(gfx),
       fireInput(firePin, true),
+      actionBindings{{fireInput, fireAction}},
       titleScene(*this),
       playScene(*this) {}
 
@@ -185,6 +179,7 @@ private:
   FastILI9341& gfx;
   DebouncedInputPin fireInput;
   ActionState fireAction;
+  ActionBinding actionBindings[1];
   DirtyRects dirty;
   SceneSwitcher sceneSwitcher;
   TitleScene titleScene;
@@ -218,55 +213,36 @@ private:
   }
 
   void onSetup() override {
-    ActionBinding bindings[] = {
-      {fireInput, fireAction},
-    };
-    configureActions(bindings, sizeof(bindings) / sizeof(bindings[0]));
+    configureActions(actionBindings, 1);
+    attachSceneSwitcher(sceneSwitcher);
 
     gfx.begin(24000000u);
     gfx.screenRotation(FastILI9341::ScreenRotation::Landscape);
     gfx.fillScreen565(Color565::rgb(0, 0, 0));
-    sceneSwitcher.setInitial(titleScene);
-    resetClock();
+    setInitialScene(titleScene);
   }
 
   void onPhysics(float delta) override {
-    sceneSwitcher.onPhysics(delta);
+    (void)delta;
   }
 
   void onProcess(float delta) override {
-    sceneSwitcher.onProcess(delta);
-  }
-
-  void onAction(ActionState& action) override {
-    if (&action != &fireAction || !action.isJustPressed()) {
-      return;
-    }
-    if (sceneSwitcher.current() != &titleScene) {
-      return;
-    }
-
-    gfx.fillScreen565(Color565::rgb(0, 0, 0));
-    sceneSwitcher.switchTo(playScene);
-    resetClock();
-  }
-
-  void onInput(const InputEvent& event) override {
-    if (!event.isActionJustPressed(fireAction)) {
-      return;
-    }
-    if (sceneSwitcher.current() != &titleScene) {
-      return;
-    }
-
-    gfx.fillScreen565(Color565::rgb(0, 0, 0));
-    sceneSwitcher.switchTo(playScene);
-    resetClock();
+    (void)delta;
   }
 };
 
 void TitleScene::onEnter() {
+  game.resetActions();
   game.gfx.fillScreen565(Color565::rgb(4, 8, 20));
+}
+
+void TitleScene::onInput(const InputEvent& event) {
+  if (!event.isActionJustPressed(game.fireAction)) {
+    return;
+  }
+
+  game.gfx.fillScreen565(Color565::rgb(0, 0, 0));
+  game.switchScene(game.playScene);
 }
 
 void TitleScene::onPhysics(float delta) {
@@ -315,7 +291,8 @@ void PlayScene::onProcess(float delta) {
 Notes:
 - The host `MiniGame` owns shared state (display, input, scene switcher).
 - Scenes are regular classes with composition (`MiniGame& game`), not subclasses of the game.
-- Keep scene transitions in `onPhysics(...)`, and rendering in `onProcess(...)`.
+- `Game` owns frame timing and scene transitions; use `setInitialScene(...)` / `switchScene(...)` instead of touching the switcher directly from outside engine code.
+- Use `resetActions()` on scene entry when you want to ignore inherited button edges from the previous scene.
 
 ## Example: Hardware scrolling with sprites (RiverRaid-style)
 ```cpp
