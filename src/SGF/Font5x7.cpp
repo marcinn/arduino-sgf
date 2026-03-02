@@ -1,19 +1,9 @@
 #include "Font5x7.h"
 
+#include "IFillRect.h"
+#include "IScreen.h"
+
 namespace Font5x7 {
-
-namespace {
-
-struct FillRectAdapterCtx {
-    FillRectFn fillRect;
-};
-
-void fillRectAdapter(void* ctx, int x, int y, int w, int h, uint16_t color565) {
-    FillRectAdapterCtx& adapter = *static_cast<FillRectAdapterCtx*>(ctx);
-    adapter.fillRect(x, y, w, h, color565);
-}
-
-}  // namespace
 
 static const uint8_t* glyph(char ch) {
     static const uint8_t GLYPH_SPACE[7] = {0, 0, 0, 0, 0, 0, 0};
@@ -181,14 +171,8 @@ bool textPixel(const char* s, int scale, int x, int y) {
     return (bits & (1u << (4 - col))) != 0;
 }
 
-void drawText(int x, int y, const char* s, int scale, uint16_t color565, FillRectFn fillRect) {
-    FillRectAdapterCtx adapter{fillRect};
-    drawText(x, y, s, scale, color565, &adapter, fillRectAdapter);
-}
-
-void drawText(int x, int y, const char* s, int scale, uint16_t color565, void* ctx,
-              FillRectCtxFn fillRect) {
-    if (!s || !fillRect || scale <= 0) {
+void drawText(int x, int y, const char* s, int scale, uint16_t color565, IFillRect& fillRect) {
+    if (!s || scale <= 0) {
         return;
     }
 
@@ -200,7 +184,8 @@ void drawText(int x, int y, const char* s, int scale, uint16_t color565, void* c
             uint8_t bits = g[row];
             for (int col = 0; col < 5; col++) {
                 if (bits & (1u << (4 - col))) {
-                    fillRect(ctx, cx + col * scale, y + row * scale, scale, scale, color565);
+                    fillRect.fillRect565(cx + col * scale, y + row * scale, scale, scale,
+                                         color565);
                 }
             }
         }
@@ -208,27 +193,19 @@ void drawText(int x, int y, const char* s, int scale, uint16_t color565, void* c
 }
 
 void drawTextBlock(int anchorX, int y, const char* s, int scale, uint16_t color565, AlignX align,
-                   FillRectFn fillRect) {
-    FillRectAdapterCtx adapter{fillRect};
-    drawTextBlock(anchorX, y, s, scale, color565, align, &adapter, fillRectAdapter);
-}
-
-void drawTextBlock(int anchorX, int y, const char* s, int scale, uint16_t color565, AlignX align,
-                   void* ctx, FillRectCtxFn fillRect) {
-    drawText(alignedTextX(anchorX, s, scale, align), y, s, scale, color565, ctx, fillRect);
+                   IFillRect& fillRect) {
+    drawText(alignedTextX(anchorX, s, scale, align), y, s, scale, color565, fillRect);
 }
 
 void drawCenteredText(int screenW, int y, const char* s, int scale, uint16_t color565,
-                      FillRectFn fillRect) {
-    FillRectAdapterCtx adapter{fillRect};
-    drawCenteredText(screenW, y, s, scale, color565, &adapter, fillRectAdapter);
-}
-
-void drawCenteredText(int screenW, int y, const char* s, int scale, uint16_t color565, void* ctx,
-                      FillRectCtxFn fillRect) {
+                      IFillRect& fillRect) {
     int w = textWidth(s, scale);
     int x = (screenW - w) / 2;
-    drawText(x, y, s, scale, color565, ctx, fillRect);
+    drawText(x, y, s, scale, color565, fillRect);
+}
+
+void drawCenteredText(IScreen& screen, int y, const char* s, int scale, uint16_t color565) {
+    drawCenteredText(screen.size().x, y, s, scale, color565, screen);
 }
 
 }  // namespace Font5x7

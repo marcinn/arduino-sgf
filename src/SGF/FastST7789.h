@@ -70,8 +70,7 @@ class FastST7789 : public IRenderTarget, public IScreen {
     void fadeOutBacklight(uint32_t durationMs) { fadeBacklightTo(BACKLIGHT_LEVEL_MIN, durationMs); }
     void tickEffects() override;
 
-    int width() const override { return curW; }
-    int height() const override { return curH; }
+    Vector2 size() const override { return Vector2{curW, curH}; }
 
     void fillScreen565(uint16_t color565) override;
     void fillRect565(int x0, int y0, int w, int h, uint16_t color565) override;

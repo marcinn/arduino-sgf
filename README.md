@@ -6,7 +6,7 @@ SGF is a lightweight C++ support library for small embedded games. It provides t
 - **Game**: Base loop with an internal frame clock. Exposes `start()`, `loop()`, `switchScene(...)`, and `resetActions()`. Derive from it and implement `onSetup()`, `onPhysics(float delta)`, and `onProcess(float delta)` to integrate your game logic and rendering.
 - **Scene** / **SceneSwitcher**: Lightweight scene interface and dispatcher for title/gameplay/game-over style flows without dynamic allocation. `Game` owns one `SceneSwitcher` internally and delegates `onAction`, `onInput`, `onPhysics`, and `onProcess` to the active scene.
 - **Actions**: Input state helpers built around `ActionState`, `ActionBinding`, and `InputEvent`. `Game` updates bound inputs, emits `pressed` / `justPressed` / `justReleased`, and `resetActions()` can resync action state to the current hardware snapshot without emitting edge events.
-- **IRenderTarget**: Minimal interface for render targets (`width()`, `height()`, `blit565(...)`) to decouple flushing from concrete display drivers.
+- **IRenderTarget**: Minimal interface for render targets (`size()`, `blit565(...)`) to decouple flushing from concrete display drivers.
 - **TileFlusher**: Tile-based dirty-rect flusher. Takes `DirtyRects`, an `IRenderTarget`, and a tile render callback to repaint only modified regions in bounded tiles.
 - **Sprites**: Software sprite layer with fixed slots (sprites + missiles), transparent key, and simple horizontal scaling modes; intended to be composed over a background buffer.
 - **DirtyRects**: Simple registry of rectangles to refresh, with clip/merge helpers to reduce overdraw.
@@ -15,8 +15,8 @@ SGF is a lightweight C++ support library for small embedded games. It provides t
 - **FastILI9341**: Display driver for ILI9341 (blitting, backlight control, rotation).
 - **Platform bus adapters**: Keep hardware/platform-specific `IDisplayBus` implementations in separate libraries such as `SGF_ESP32` or `SGF_ArduinoQ`, then include them explicitly from the sketch.
 - **RectFlashAnim**: Utility for animating flashing rectangles, built on `DirtyRects`.
-- **Font5x7**: Fixed 5x7 bitmap font routines (width calculation, pixel sampling, drawing through plain or context-aware fill callbacks).
-- **TextBlock**: Small text primitive that owns its content/style, marks `DirtyRects` on changes, and renders through SGF font callbacks.
+- **Font5x7**: Fixed 5x7 bitmap font routines (width calculation, pixel sampling, drawing through typed fill targets).
+- **TextBlock**: Small text primitive that owns its content/style, marks `DirtyRects` on changes, and renders through typed SGF font targets.
 - **Renderer2D + built-in scroll helper**: `Renderer2D` owns the 1D scroll helper internally and stitches together optional hardware scroll, background redraw, sprites, and dirty-rect tile flushing. The active on-screen axis depends on rotation (portrait: vertical, landscape: horizontal).
 
 ## Typical use
@@ -264,8 +264,8 @@ void PlayScene::onPhysics(float delta) {
     game.boxX = 0;
     game.boxVX = -game.boxVX;
   }
-  if (game.boxX > game.gfx.width() - 16) {
-    game.boxX = game.gfx.width() - 16;
+  if (game.boxX > game.gfx.size().x - 16) {
+    game.boxX = game.gfx.size().x - 16;
     game.boxVX = -game.boxVX;
   }
 
@@ -275,7 +275,7 @@ void PlayScene::onPhysics(float delta) {
 
 void PlayScene::onProcess(float delta) {
   (void)delta;
-  game.dirty.clip(game.gfx.width(), game.gfx.height());
+  game.dirty.clip(game.gfx.size().x, game.gfx.size().y);
   game.dirty.mergeAll();
   for (int i = 0; i < game.dirty.count(); ++i) {
     const Rect& r = game.dirty[i];

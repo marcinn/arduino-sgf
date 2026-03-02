@@ -7,6 +7,7 @@
 - Keep the project’s style/structure; do not impose your own organization unasked.
 - Follow `CODING_STANDARDS.md` for any C++/Arduino code changes.
 - Obey every single rule in `CODING_STANDARDS.md` without exception; treat each point as mandatory, not advisory.
+- If the user gives a hard requirement to replace bad API/design, remove the bad API instead of keeping compatibility overloads, adapters, or transitional wrappers.
 - Core structure is described in `README.md`; consult it when touching shared components.
 - Prefer small, precise patches over sweeping rewrites.
 - Ask when something is unclear instead of guessing.

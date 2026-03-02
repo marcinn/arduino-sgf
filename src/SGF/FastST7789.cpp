@@ -13,10 +13,6 @@ constexpr int SWAP_TMP_MAX_PIXELS = 320 * 4;
 
 uint16_t be16(uint16_t value) { return (uint16_t)((value << 8) | (value >> 8)); }
 
-void fillRectForFont(void* ctx, int x, int y, int w, int h, uint16_t color565) {
-    static_cast<FastST7789*>(ctx)->fillRect565(x, y, w, h, color565);
-}
-
 }  // namespace
 
 constexpr uint8_t FastST7789::st7789Madctl(ScreenRotation rotation) {
@@ -270,7 +266,7 @@ void FastST7789::fillRect565(int x0, int y0, int w, int h, uint16_t color565) {
 }
 
 void FastST7789::drawText(int x, int y, const char* text, int scale, uint16_t color565) {
-    Font5x7::drawText(x, y, text, scale, color565, this, fillRectForFont);
+    Font5x7::drawText(x, y, text, scale, color565, *this);
 }
 
 void FastST7789::blit565(int x0, int y0, int w, int h, const uint16_t* pix) {

@@ -3,14 +3,6 @@
 #include "SGF/Color565.h"
 #include "SGF/Font5x7.h"
 
-namespace {
-
-void fillRectForFont(void* ctx, int x, int y, int w, int h, uint16_t color565) {
-    static_cast<FastILI9341*>(ctx)->fillRect565(x, y, w, h, color565);
-}
-
-}  // namespace
-
 constexpr uint8_t FastILI9341::toMadctl(IScreen::Rotation rotation) {
     switch (rotation) {
         case IScreen::Rotation::Portrait:
@@ -224,7 +216,7 @@ void FastILI9341::fillRect565(int x0, int y0, int w, int h, uint16_t color565) {
 }
 
 void FastILI9341::drawText(int x, int y, const char* text, int scale, uint16_t color565) {
-    Font5x7::drawText(x, y, text, scale, color565, this, fillRectForFont);
+    Font5x7::drawText(x, y, text, scale, color565, *this);
 }
 
 void FastILI9341::blit565(int x0, int y0, int w, int h, const uint16_t* pix) {

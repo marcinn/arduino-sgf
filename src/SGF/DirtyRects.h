@@ -14,8 +14,9 @@ class DirtyRects {
     void clear() { n = 0; }
     void invalidate(const IRenderTarget& target) {
         clear();
-        if (target.width() > 0 && target.height() > 0) {
-            add(0, 0, target.width() - 1, target.height() - 1);
+        Vector2 targetSize = target.size();
+        if (targetSize.x > 0 && targetSize.y > 0) {
+            add(0, 0, targetSize.x - 1, targetSize.y - 1);
         }
     }
 

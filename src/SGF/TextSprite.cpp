@@ -48,9 +48,8 @@ int TextSprite::width() const { return bitmapW; }
 
 int TextSprite::height() const { return bitmapH; }
 
-void TextSprite::fillRectInBitmap(void* ctx, int x, int y, int w, int h, uint16_t color565) {
-    TextSprite& sprite = *static_cast<TextSprite*>(ctx);
-    if (w <= 0 || h <= 0 || sprite.bitmapW <= 0 || sprite.bitmapH <= 0) {
+void TextSprite::fillRect565(int x, int y, int w, int h, uint16_t color565) {
+    if (w <= 0 || h <= 0 || bitmapW <= 0 || bitmapH <= 0) {
         return;
     }
 
@@ -58,14 +57,14 @@ void TextSprite::fillRectInBitmap(void* ctx, int x, int y, int w, int h, uint16_
     int y1 = y + h;
     int clipX0 = x < 0 ? 0 : x;
     int clipY0 = y < 0 ? 0 : y;
-    int clipX1 = x1 > sprite.bitmapW ? sprite.bitmapW : x1;
-    int clipY1 = y1 > sprite.bitmapH ? sprite.bitmapH : y1;
+    int clipX1 = x1 > bitmapW ? bitmapW : x1;
+    int clipY1 = y1 > bitmapH ? bitmapH : y1;
     if (clipX0 >= clipX1 || clipY0 >= clipY1) {
         return;
     }
 
     for (int yy = clipY0; yy < clipY1; ++yy) {
-        uint16_t* row = sprite.pixels565 + yy * sprite.bitmapW;
+        uint16_t* row = pixels565 + yy * bitmapW;
         for (int xx = clipX0; xx < clipX1; ++xx) {
             row[xx] = color565;
         }
@@ -90,7 +89,7 @@ void TextSprite::rebuildBitmap() {
     }
 
     if (bitmapW > 0 && bitmapH > 0) {
-        Font5x7::drawText(0, 0, text_, scale, color565, this, fillRectInBitmap);
+        Font5x7::drawText(0, 0, text_, scale, color565, *this);
     }
     syncBoundSprite();
 }

@@ -2,7 +2,10 @@
 
 #include <stdint.h>
 
-class IScreen {
+#include "IFillRect.h"
+#include "Vector2.h"
+
+class IScreen : public IFillRect {
    public:
     enum class Rotation : uint8_t {
         Portrait = 0,
@@ -16,8 +19,9 @@ class IScreen {
     virtual void setRotation(Rotation rotation) = 0;
     virtual Rotation rotation() const = 0;
 
+    virtual Vector2 size() const = 0;
+
     virtual void fillScreen565(uint16_t color565) = 0;
-    virtual void fillRect565(int x0, int y0, int w, int h, uint16_t color565) = 0;
 
     virtual void setBacklight(uint8_t level) = 0;
     virtual uint8_t backlight() const = 0;

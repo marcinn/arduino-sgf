@@ -45,8 +45,7 @@ class FastILI9341 : public IRenderTarget, public IScreen {
     void fadeOutBacklight(uint32_t durationMs) { fadeBacklightTo(BACKLIGHT_LEVEL_MIN, durationMs); }
     void tickEffects() override;
 
-    int width() const override { return curW; }
-    int height() const override { return curH; }
+    Vector2 size() const override { return Vector2{curW, curH}; }
 
     void fillScreen565(uint16_t color565) override;  // Color in native RGB565 (not byte-swapped).
     void fillRect565(int x0, int y0, int w, int h, uint16_t color565) override;
@@ -56,9 +55,9 @@ class FastILI9341 : public IRenderTarget, public IScreen {
     void blit565(int x0, int y0, int w, int h, const uint16_t* pix) override;
 
     // ILI9341 hardware vertical scroll.
-    // top + height + bottom must equal height() in the current orientation.
+    // top + height + bottom must equal size().y in the current orientation.
     void setScrollArea(uint16_t topFixed, uint16_t scrollHeight, uint16_t bottomFixed) override;
-    // yOff wraps mod height(); 0 means topFixed is visible at the top edge.
+    // yOff wraps mod size().y; 0 means topFixed is visible at the top edge.
     void scrollTo(uint16_t yOff) override;
 
    private:

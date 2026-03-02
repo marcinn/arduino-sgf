@@ -4,43 +4,15 @@
 
 namespace {
 
-struct BufferFillCtx {
-    int regionX0;
-    int regionY0;
-    int regionW;
-    int regionH;
-    uint16_t* buf;
-};
-
-void fillRectInRegion(void* ctxPtr, int x, int y, int w, int h, uint16_t color565) {
-    BufferFillCtx& ctx = *static_cast<BufferFillCtx*>(ctxPtr);
-    if (!ctx.buf || w <= 0 || h <= 0) {
-        return;
-    }
-
-    const int x1 = x + w;
-    const int y1 = y + h;
-    const int clipX0 = max(ctx.regionX0, x);
-    const int clipY0 = max(ctx.regionY0, y);
-    const int clipX1 = min(ctx.regionX0 + ctx.regionW, x1);
-    const int clipY1 = min(ctx.regionY0 + ctx.regionH, y1);
-    if (clipX0 >= clipX1 || clipY0 >= clipY1) {
-        return;
-    }
-
-    for (int yy = clipY0; yy < clipY1; ++yy) {
-        uint16_t* row = ctx.buf + (yy - ctx.regionY0) * ctx.regionW;
-        for (int xx = clipX0; xx < clipX1; ++xx) {
-            row[xx - ctx.regionX0] = color565;
-        }
-    }
-}
-
 int font5x7TextWidth(const char* text, int scale) { return Font5x7::textWidth(text, scale); }
 
-void drawFont5x7Text(int x, int y, const char* text, int scale, uint16_t color565, void* ctx,
-                     Font5x7::FillRectCtxFn fillRect) {
-    Font5x7::drawText(x, y, text, scale, color565, ctx, fillRect);
+void drawFont5x7Text(int x,
+                     int y,
+                     const char* text,
+                     int scale,
+                     uint16_t color565,
+                     IFillRect& fillRect) {
+    Font5x7::drawText(x, y, text, scale, color565, fillRect);
 }
 
 }  // namespace
@@ -166,8 +138,8 @@ void TextBlock::render(int x0, int y0, int w, int h, uint16_t* buf) const {
         return;
     }
 
-    BufferFillCtx fillCtx{x0, y0, w, h, buf};
-    font_->drawText(drawX(), posY_, text_, scale_, color565_, &fillCtx, fillRectInRegion);
+    BufferFillRect fillRect(x0, y0, w, h, buf);
+    font_->drawText(drawX(), posY_, text_, scale_, color565_, fillRect);
 }
 
 bool TextBlock::hasVisibleText() const {

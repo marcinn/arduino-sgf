@@ -17,8 +17,8 @@ class HardwareScroller {
     // `worldOffset` is the logical coordinate of the newly exposed strip on the
     // active scroll axis. `span` is the strip thickness in pixels.
     // Buffer layout is row-major for the strip rectangle:
-    // - Portrait:  width() x span
-    // - Landscape: span x height()
+    // - Portrait:  size().x x span
+    // - Landscape: span x size().y
     using RenderStripFn = std::function<void(int32_t worldOffset, int span, uint16_t* buf)>;
     using BlitStripFn = std::function<void(int physPos, int span, uint16_t* buf)>;
 
@@ -26,7 +26,7 @@ class HardwareScroller {
         : target_(target), hardwareEnabled_(target.supportsHardwareScroll()) {}
 
     // fixedStart + scrollSpan + fixedEnd must equal the active axis length
-    // (Portrait: height(), Landscape: width()).
+    // (Portrait: size().y, Landscape: size().x).
     void configure(uint16_t topFixed, uint16_t scrollHeight, uint16_t bottomFixed);
     void configureFullScreen();
 
@@ -38,21 +38,23 @@ class HardwareScroller {
     // - Landscape: delta>0 moves the image left (new strip appears on the right)
     //
     // `buf` must contain at least:
-    // - Portrait:  width() * maxStripLines pixels
-    // - Landscape: maxStripLines * height() pixels
+    // - Portrait:  size().x * maxStripLines pixels
+    // - Landscape: maxStripLines * size().y pixels
     //
     // Large deltas are split into chunks with |step| <= maxStripLines.
     // If `blitStrip` is not provided, a default full-strip blit is used.
     void scroll(int delta, uint16_t* buf, int maxStripLines, const RenderStripFn& renderStrip,
                 const BlitStripFn& blitStrip = {});
 
-    bool scrollsAlongY() const { return target_.height() >= target_.width(); }
+    bool scrollsAlongY() const { return target_.size().y >= target_.size().x; }
     bool axisInverted() const { return hardwareEnabled_ && target_.scrollAxisInverted(); }
     uint16_t axisLength() const {
-        return (uint16_t)(scrollsAlongY() ? target_.height() : target_.width());
+        Vector2 targetSize = target_.size();
+        return (uint16_t)(scrollsAlongY() ? targetSize.y : targetSize.x);
     }
     uint16_t crossLength() const {
-        return (uint16_t)(scrollsAlongY() ? target_.width() : target_.height());
+        Vector2 targetSize = target_.size();
+        return (uint16_t)(scrollsAlongY() ? targetSize.x : targetSize.y);
     }
 
     uint16_t fixedStart() const { return topFixed_; }

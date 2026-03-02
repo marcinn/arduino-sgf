@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "BufferFillRect.h"
 #include "DirtyRects.h"
 #include "Font5x7.h"
 
@@ -16,8 +17,8 @@ class TextBlock {
 
     struct Font {
         int (*textWidth)(const char* text, int scale);
-        void (*drawText)(int x, int y, const char* text, int scale, uint16_t color565, void* ctx,
-                         Font5x7::FillRectCtxFn fillRect);
+        void (*drawText)(int x, int y, const char* text, int scale, uint16_t color565,
+                         IFillRect& fillRect);
         int glyphHeight = 0;
     };
 

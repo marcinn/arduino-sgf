@@ -2,6 +2,9 @@
 
 #include <Arduino.h>
 
+class IFillRect;
+class IScreen;
+
 namespace Font5x7 {
 
 enum class AlignX : uint8_t {
@@ -10,22 +13,14 @@ enum class AlignX : uint8_t {
     Right,
 };
 
-using FillRectFn = void (*)(int x, int y, int w, int h, uint16_t color565);
-using FillRectCtxFn = void (*)(void* ctx, int x, int y, int w, int h, uint16_t color565);
-
 int textWidth(const char* s, int scale);
 int alignedTextX(int anchorX, const char* s, int scale, AlignX align);
 bool textPixel(const char* s, int scale, int x, int y);
-void drawText(int x, int y, const char* s, int scale, uint16_t color565, FillRectFn fillRect);
-void drawText(int x, int y, const char* s, int scale, uint16_t color565, void* ctx,
-              FillRectCtxFn fillRect);
+void drawText(int x, int y, const char* s, int scale, uint16_t color565, IFillRect& fillRect);
 void drawTextBlock(int anchorX, int y, const char* s, int scale, uint16_t color565, AlignX align,
-                   FillRectFn fillRect);
-void drawTextBlock(int anchorX, int y, const char* s, int scale, uint16_t color565, AlignX align,
-                   void* ctx, FillRectCtxFn fillRect);
+                   IFillRect& fillRect);
 void drawCenteredText(int screenW, int y, const char* s, int scale, uint16_t color565,
-                      FillRectFn fillRect);
-void drawCenteredText(int screenW, int y, const char* s, int scale, uint16_t color565, void* ctx,
-                      FillRectCtxFn fillRect);
+                      IFillRect& fillRect);
+void drawCenteredText(IScreen& screen, int y, const char* s, int scale, uint16_t color565);
 
 }  // namespace Font5x7

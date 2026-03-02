@@ -4,9 +4,10 @@
 
 #include "SGF/Character.h"
 #include "SGF/Font5x7.h"
+#include "SGF/IFillRect.h"
 #include "SGF/Sprites.h"
 
-class TextSprite : public Character {
+class TextSprite : public Character, public IFillRect {
    public:
     enum class AlignX : uint8_t {
         Left,
@@ -24,11 +25,11 @@ class TextSprite : public Character {
     void setScale(int newScale);
     void setColor(uint16_t newColor565);
     void setAlignX(AlignX newAlignX);
+    void fillRect565(int x0, int y0, int w, int h, uint16_t color565) override;
     int width() const;
     int height() const;
 
    private:
-    static void fillRectInBitmap(void* ctx, int x, int y, int w, int h, uint16_t color565);
     void didSetPosition() override;
 
     void rebuildBitmap();

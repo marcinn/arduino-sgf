@@ -1,6 +1,7 @@
 #pragma once
 #include "SGF/ActionState.h"
 #include "SGF/ActionBinding.h"
+#include "SGF/BufferFillRect.h"
 #include "SGF/Character.h"
 #include "SGF/Collision.h"
 #include "SGF/Color565.h"
@@ -12,6 +13,7 @@
 #include "SGF/Game.h"
 #include "SGF/HardwareProfile.h"
 #include "SGF/IDisplayBus.h"
+#include "SGF/IFillRect.h"
 #include "SGF/IRenderTarget.h"
 #include "SGF/IInput.h"
 #include "SGF/IScreen.h"
