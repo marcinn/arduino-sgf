@@ -183,6 +183,8 @@ Exported `ENABLE_*` variables are forwarded as preprocessor defines. Example:
 ENABLE_CTRL4B=1 sgf flash board=esp32 port=/dev/ttyUSB0
 ```
 
+`ENABLE_FPS=1` enables a small FPS overlay rendered by `Renderer2D` as the top-most debug layer in the normal render pipeline.
+
 If `arduino-cli` is bundled inside Arduino IDE and not available in `PATH`, pass the IDE root:
 
 ```bash

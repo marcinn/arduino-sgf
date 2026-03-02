@@ -120,7 +120,7 @@ class Renderer2D : public IRenderer {
     // Flushes dirty rects: background render -> sprite overlay -> blit.
     // `regionBuf` must contain at least tileW*tileH pixels.
     void flush(uint16_t* regionBuf);
-    void render() override { flush(regionBuf); }
+    void render() override;
 
    private:
     IRenderTarget& target;
@@ -140,8 +140,18 @@ class Renderer2D : public IRenderer {
         uint32_t redrawRevision = 0;
     };
     std::array<SpriteSnapshot, SpriteLayer::MAX_SPRITES> spriteSnapshots{};
+#ifdef ENABLE_FPS
+    uint32_t fpsWindowStartMs = 0;
+    uint16_t fpsFrameCount = 0;
+    uint16_t fpsValue = 0;
+#endif
 
     void addSpriteGhosts(int delta);
     void trackSpriteChanges();
     static void spriteBounds(const Sprite& s, Rect* out);
+#ifdef ENABLE_FPS
+    void updateFps();
+    void markFpsDirty();
+    void renderFpsOverlay(int x0, int y0, int w, int h, uint16_t* buf);
+#endif
 };

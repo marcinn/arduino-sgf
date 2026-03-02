@@ -1,8 +1,21 @@
+#include <Arduino.h>
+
 #include "Renderer2D.h"
 
 #include <algorithm>
 
+#include "BufferFillRect.h"
+#include "Color565.h"
+#include "Font5x7.h"
+#include "FontRenderer.h"
+
 namespace {
+#ifdef ENABLE_FPS
+constexpr int FPS_TEXT_SCALE = 1;
+constexpr int FPS_PADDING = 1;
+constexpr int FPS_OVERLAY_WIDTH = 42 + (FPS_PADDING * 2);
+constexpr int FPS_OVERLAY_HEIGHT = 7 + (FPS_PADDING * 2);
+#endif
 
 static void blitSubRectRows(IRenderTarget& target, int dstX, int dstY, int w, int h,
                             const uint16_t* src, int srcStride, int srcX) {
@@ -127,6 +140,14 @@ Renderer2D::Renderer2D(IRenderTarget& target, DirtyRects& dirty, int tileW, int 
       flusher(dirty, tileW, tileH),
       tileW(tileW),
       tileH(tileH) {}
+
+void Renderer2D::render() {
+#ifdef ENABLE_FPS
+    updateFps();
+    markFpsDirty();
+#endif
+    flush(regionBuf);
+}
 
 void Renderer2D::configureScroll(uint16_t fixedStart, uint16_t scrollSpan, uint16_t fixedEnd) {
     scroller.configure(fixedStart, scrollSpan, fixedEnd);
@@ -301,9 +322,47 @@ void Renderer2D::flush(uint16_t* regionBuf) {
             std::fill(buf, buf + w * h, (uint16_t)0);
         }
         sprites.renderRegion(x0, y0, w, h, buf);
+#ifdef ENABLE_FPS
+        renderFpsOverlay(x0, y0, w, h, buf);
+#endif
     });
 }
 
 void Renderer2D::spriteBounds(const Sprite& s, Rect* out) {
     SpriteLayer::spriteBounds(s, &out->x0, &out->y0, &out->x1, &out->y1);
 }
+
+#ifdef ENABLE_FPS
+void Renderer2D::updateFps() {
+    uint32_t now = millis();
+    if (fpsWindowStartMs == 0) {
+        fpsWindowStartMs = now;
+    }
+
+    fpsFrameCount++;
+    uint32_t elapsed = now - fpsWindowStartMs;
+    if (elapsed < 1000u) {
+        return;
+    }
+
+    fpsValue = (uint16_t)((fpsFrameCount * 1000u) / elapsed);
+    fpsFrameCount = 0;
+    fpsWindowStartMs = now;
+}
+
+void Renderer2D::markFpsDirty() {
+    dirty.add(0, 0, FPS_OVERLAY_WIDTH - 1, FPS_OVERLAY_HEIGHT - 1);
+}
+
+void Renderer2D::renderFpsOverlay(int x0, int y0, int w, int h, uint16_t* buf) {
+    BufferFillRect fillRect(x0, y0, w, h, buf);
+    fillRect.fillRect565(0, 0, FPS_OVERLAY_WIDTH, FPS_OVERLAY_HEIGHT, Color565::rgb(0, 0, 0));
+
+    char text[] = "FPS:000";
+    text[4] = (char)('0' + ((fpsValue / 100) % 10));
+    text[5] = (char)('0' + ((fpsValue / 10) % 10));
+    text[6] = (char)('0' + (fpsValue % 10));
+    FontRenderer::drawText(FONT_5X7, fillRect, FPS_PADDING, FPS_PADDING, text, FPS_TEXT_SCALE,
+                           Color565::rgb(255, 255, 255));
+}
+#endif
