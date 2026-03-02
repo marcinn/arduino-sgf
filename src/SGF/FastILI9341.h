@@ -9,14 +9,6 @@
 
 class FastILI9341 : public IRenderTarget, public IScreen {
    public:
-    enum class ScreenRotation : uint8_t {
-        Landscape = 0xE8,
-        Portrait = 0x48,
-        LandscapeFlip = 0x28,
-        PortraitFlip = 0x88,
-    };
-    using Rotation = ScreenRotation;  // backward-compatible alias
-
     static constexpr uint8_t MADCTL_MY = 0x80;
     static constexpr uint8_t MADCTL_MX = 0x40;
     static constexpr uint8_t MADCTL_MV = 0x20;
@@ -30,14 +22,13 @@ class FastILI9341 : public IRenderTarget, public IScreen {
 
     bool begin(uint32_t spi_hz);  // Init with the default orientation.
     bool begin(uint32_t spi_hz, uint8_t madctl);
-    void setSPIFrequency(uint32_t spi_hz);
     void screenRotation(uint8_t madctl);
-    void screenRotation(ScreenRotation rot) { screenRotation((uint8_t)rot); }
-    void setRotation(IScreen::Rotation rotation) override;
-    IScreen::Rotation rotation() const override;
+    void screenRotation(ScreenRotation rotation) { screenRotation(toMadctl(rotation)); }
+    void setRotation(ScreenRotation rotation) override;
+    ScreenRotation rotation() const override;
     bool supportsHardwareScroll() const override { return true; }
     // The ILI9341 vertical-scroll axis is mirrored when MADCTL_MY is set.
-    bool scrollAxisInverted() const override { return (rotationMadctl_ & MADCTL_MY) != 0; }
+    bool scrollAxisInverted() const override { return (rotationMadctl & MADCTL_MY) != 0; }
     void setBacklight(uint8_t level) override;  // normalized brightness 0..BACKLIGHT_LEVEL_MAX
     uint8_t backlight() const override { return backlightLevel; }
     void fadeBacklightTo(uint8_t targetLevel, uint32_t durationMs);
@@ -60,18 +51,18 @@ class FastILI9341 : public IRenderTarget, public IScreen {
     void scrollTo(uint16_t yOff) override;
 
    private:
-    IDisplayBus& bus_;
+    IDisplayBus& bus;
     static constexpr int W = 320;
     static constexpr int H = 240;
     int curW = W;
     int curH = H;
 
     uint8_t backlightLevel = BACKLIGHT_LEVEL_MAX;
-    uint8_t rotationMadctl_ = (uint8_t)ScreenRotation::Landscape;
+    uint8_t rotationMadctl = 0xE8u;
     BacklightFade backlightFade;
 
-    static constexpr uint8_t toMadctl(IScreen::Rotation rotation);
-    static constexpr IScreen::Rotation toInterfaceRotation(uint8_t madctl);
+    static uint8_t toMadctl(ScreenRotation rotation);
+    static ScreenRotation toInterfaceRotation(uint8_t madctl);
     void applyBacklightLevel(uint8_t level);
     void updateBacklightFade();
     void updateDimensions(uint8_t madctl);

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CharacterBody.h"
-#include "Renderer.h"
+#include "Renderer2D.h"
 
 class SpriteCharacter : public CharacterBody {
    public:

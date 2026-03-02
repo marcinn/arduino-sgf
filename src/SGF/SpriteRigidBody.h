@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Renderer.h"
+#include "Renderer2D.h"
 #include "RigidBody.h"
 
 class SpriteRigidBody : public RigidBody {

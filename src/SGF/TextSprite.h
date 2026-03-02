@@ -5,7 +5,7 @@
 #include "CharacterBody.h"
 #include "Font5x7.h"
 #include "IFillRect.h"
-#include "Renderer.h"
+#include "Renderer2D.h"
 
 class TextSprite : public CharacterBody, public IFillRect {
    public:

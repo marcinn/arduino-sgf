@@ -9,14 +9,6 @@
 
 class FastST7789 : public IRenderTarget, public IScreen {
    public:
-    enum class ScreenRotation : uint8_t {
-        Portrait = 0,
-        Landscape = 1,
-        PortraitFlip = 2,
-        LandscapeFlip = 3,
-    };
-    using Rotation = ScreenRotation;
-
     static constexpr uint8_t MADCTL_MY = 0x80;
     static constexpr uint8_t MADCTL_MX = 0x40;
     static constexpr uint8_t MADCTL_MV = 0x20;
@@ -57,10 +49,9 @@ class FastST7789 : public IRenderTarget, public IScreen {
 
     bool begin(uint32_t spi_hz);
     bool begin(uint32_t spi_hz, ScreenRotation rotation);
-    void setSPIFrequency(uint32_t spi_hz);
     void screenRotation(ScreenRotation rotation);
-    void setRotation(IScreen::Rotation rotation) override;
-    IScreen::Rotation rotation() const override;
+    void setRotation(ScreenRotation rotation) override;
+    ScreenRotation rotation() const override;
     bool supportsHardwareScroll() const override { return true; }
     bool scrollAxisInverted() const override;
     void setBacklight(uint8_t level) override;
@@ -79,17 +70,15 @@ class FastST7789 : public IRenderTarget, public IScreen {
     void scrollTo(uint16_t yOffset) override;
 
    private:
-    IDisplayBus& bus_;
+    IDisplayBus& bus;
     PanelConfig panel;
     int curW = 0;
     int curH = 0;
     uint8_t backlightLevel = BACKLIGHT_LEVEL_MAX;
-    ScreenRotation currentRotation_ = ScreenRotation::Landscape;
+    ScreenRotation currentRotation = ScreenRotation::Landscape;
     BacklightFade backlightFade;
 
-    static constexpr uint8_t st7789Madctl(ScreenRotation rotation);
-    static constexpr ScreenRotation toScreenRotation(IScreen::Rotation rotation);
-    static constexpr IScreen::Rotation toInterfaceRotation(ScreenRotation rotation);
+    static uint8_t st7789Madctl(ScreenRotation rotation);
     void applyBacklightLevel(uint8_t level);
     void updateBacklightFade();
     void updateDimensions();

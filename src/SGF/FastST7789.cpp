@@ -13,7 +13,7 @@ uint16_t be16(uint16_t value) { return (uint16_t)((value << 8) | (value >> 8)); 
 
 }  // namespace
 
-constexpr uint8_t FastST7789::st7789Madctl(ScreenRotation rotation) {
+uint8_t FastST7789::st7789Madctl(ScreenRotation rotation) {
     switch (rotation) {
         case ScreenRotation::Portrait:
             return (uint8_t)(MADCTL_MX | MADCTL_MY);
@@ -27,22 +27,12 @@ constexpr uint8_t FastST7789::st7789Madctl(ScreenRotation rotation) {
     }
 }
 
-constexpr FastST7789::ScreenRotation FastST7789::toScreenRotation(IScreen::Rotation rotation) {
-    return static_cast<ScreenRotation>(rotation);
-}
-
-constexpr IScreen::Rotation FastST7789::toInterfaceRotation(ScreenRotation rotation) {
-    return static_cast<IScreen::Rotation>(rotation);
-}
-
 FastST7789::FastST7789(IDisplayBus& bus, const PanelConfig& panel)
-    : bus_(bus), panel(panel), curW(panel.width), curH(panel.height) {}
-
-void FastST7789::setSPIFrequency(uint32_t spi_hz) { bus_.setFrequency(spi_hz); }
+    : bus(bus), panel(panel), curW(panel.width), curH(panel.height) {}
 
 void FastST7789::applyBacklightLevel(uint8_t level) {
     backlightLevel = level;
-    bus_.setBacklight(level);
+    bus.setBacklight(level);
 }
 
 void FastST7789::setBacklight(uint8_t level) {
@@ -79,16 +69,16 @@ void FastST7789::updateBacklightFade() {
 
 bool FastST7789::begin(uint32_t spi_hz) { return begin(spi_hz, ScreenRotation::Landscape); }
 
-void FastST7789::cmd(uint8_t command) { bus_.writeCommand(command); }
+void FastST7789::cmd(uint8_t command) { bus.writeCommand(command); }
 
-void FastST7789::data(const uint8_t* bytes, size_t size) { bus_.writeData(bytes, size); }
+void FastST7789::data(const uint8_t* bytes, size_t size) { bus.writeData(bytes, size); }
 
-void FastST7789::streamBegin() { bus_.beginDataWrite(); }
+void FastST7789::streamBegin() { bus.beginDataWrite(); }
 
-void FastST7789::streamEnd() { bus_.endDataWrite(); }
+void FastST7789::streamEnd() { bus.endDataWrite(); }
 
 FastST7789::Offset FastST7789::currentOffset() const {
-    switch (currentRotation_) {
+    switch (currentRotation) {
         case ScreenRotation::Portrait:
             return panel.portrait;
         case ScreenRotation::Landscape:
@@ -116,11 +106,11 @@ void FastST7789::setWindow(int x0, int y0, int x1, int y1) {
     cmd(0x2C);
 }
 
-void FastST7789::hwReset() { bus_.hardwareReset(); }
+void FastST7789::hwReset() { bus.hardwareReset(); }
 
 void FastST7789::updateDimensions() {
-    bool swapped = currentRotation_ == ScreenRotation::Landscape ||
-                   currentRotation_ == ScreenRotation::LandscapeFlip;
+    bool swapped = currentRotation == ScreenRotation::Landscape ||
+                   currentRotation == ScreenRotation::LandscapeFlip;
     if (swapped) {
         curW = panel.height;
         curH = panel.width;
@@ -131,21 +121,21 @@ void FastST7789::updateDimensions() {
 }
 
 void FastST7789::screenRotation(ScreenRotation nextRotation) {
-    currentRotation_ = nextRotation;
+    currentRotation = nextRotation;
     uint8_t madctl = (uint8_t)(st7789Madctl(nextRotation) | panel.colorOrder);
     cmd(0x36);
     data(&madctl, 1);
     updateDimensions();
 }
 
-void FastST7789::setRotation(IScreen::Rotation rotation) {
-    screenRotation(toScreenRotation(rotation));
+void FastST7789::setRotation(ScreenRotation rotation) {
+    screenRotation(rotation);
 }
 
-IScreen::Rotation FastST7789::rotation() const { return toInterfaceRotation(currentRotation_); }
+ScreenRotation FastST7789::rotation() const { return currentRotation; }
 
 bool FastST7789::scrollAxisInverted() const {
-    return (st7789Madctl(currentRotation_) & MADCTL_MY) != 0;
+    return (st7789Madctl(currentRotation) & MADCTL_MY) != 0;
 }
 
 void FastST7789::setScrollArea(uint16_t topFixed, uint16_t scrollHeight, uint16_t bottomFixed) {
@@ -161,7 +151,7 @@ void FastST7789::scrollTo(uint16_t yOffset) {
 }
 
 bool FastST7789::begin(uint32_t spi_hz, ScreenRotation initialRotation) {
-    if (!bus_.begin(spi_hz)) {
+    if (!bus.begin(spi_hz)) {
         return false;
     }
     applyBacklightLevel(backlightLevel);
@@ -202,7 +192,7 @@ bool FastST7789::begin(uint32_t spi_hz, ScreenRotation initialRotation) {
 
 void FastST7789::fillScreen565(uint16_t color565) {
     static uint16_t strip[FILL_SCREEN_MAX_W * FILL_SCREEN_STRIP_H];
-    const bool usePixelWrite = bus_.supportsWritePixels565();
+    const bool usePixelWrite = bus.supportsWritePixels565();
     uint16_t color = usePixelWrite ? color565 : Color565::bswap(color565);
 
     for (int i = 0; i < FILL_SCREEN_MAX_W * FILL_SCREEN_STRIP_H; i++) {
@@ -214,9 +204,9 @@ void FastST7789::fillScreen565(uint16_t color565) {
         setWindow(0, y, curW - 1, y + h - 1);
         streamBegin();
         if (usePixelWrite) {
-            bus_.writePixels565(strip, (size_t)(curW * h));
+            bus.writePixels565(strip, (size_t)(curW * h));
         } else {
-            bus_.writeDataChunk((const uint8_t*)strip, (size_t)(curW * h * 2));
+            bus.writeDataChunk((const uint8_t*)strip, (size_t)(curW * h * 2));
         }
         streamEnd();
     }
@@ -271,8 +261,8 @@ void FastST7789::blit565(int x0, int y0, int w, int h, const uint16_t* pix) {
     const int count = w * h;
     setWindow(x0, y0, x0 + w - 1, y0 + h - 1);
     streamBegin();
-    if (bus_.supportsWritePixels565()) {
-        bus_.writePixels565(pix, (size_t)count);
+    if (bus.supportsWritePixels565()) {
+        bus.writePixels565(pix, (size_t)count);
     } else {
         static uint16_t tmp[SWAP_TMP_MAX_PIXELS];
         int offset = 0;
@@ -281,7 +271,7 @@ void FastST7789::blit565(int x0, int y0, int w, int h, const uint16_t* pix) {
             for (int i = 0; i < chunk; i++) {
                 tmp[i] = Color565::bswap(pix[offset + i]);
             }
-            bus_.writeDataChunk((const uint8_t*)tmp, (size_t)(chunk * 2));
+            bus.writeDataChunk((const uint8_t*)tmp, (size_t)(chunk * 2));
             offset += chunk;
         }
     }

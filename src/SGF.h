@@ -24,7 +24,7 @@
 #include "SGF/Math.h"
 #include "SGF/Physics.h"
 #include "SGF/RectFlashAnim.h"
-#include "SGF/Renderer.h"
+#include "SGF/Renderer2D.h"
 #include "SGF/RigidBody.h"
 #include "SGF/Scene.h"
 #include "SGF/Scroller.h"

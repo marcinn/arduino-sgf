@@ -2,41 +2,39 @@
 
 #include "Color565.h"
 
-constexpr uint8_t FastILI9341::toMadctl(IScreen::Rotation rotation) {
+uint8_t FastILI9341::toMadctl(ScreenRotation rotation) {
     switch (rotation) {
-        case IScreen::Rotation::Portrait:
-            return (uint8_t)ScreenRotation::Portrait;
-        case IScreen::Rotation::Landscape:
-            return (uint8_t)ScreenRotation::Landscape;
-        case IScreen::Rotation::PortraitFlip:
-            return (uint8_t)ScreenRotation::PortraitFlip;
-        case IScreen::Rotation::LandscapeFlip:
+        case ScreenRotation::Portrait:
+            return 0x48u;
+        case ScreenRotation::Landscape:
+            return 0xE8u;
+        case ScreenRotation::PortraitFlip:
+            return 0x88u;
+        case ScreenRotation::LandscapeFlip:
         default:
-            return (uint8_t)ScreenRotation::LandscapeFlip;
+            return 0x28u;
     }
 }
 
-constexpr IScreen::Rotation FastILI9341::toInterfaceRotation(uint8_t madctl) {
+ScreenRotation FastILI9341::toInterfaceRotation(uint8_t madctl) {
     switch (madctl) {
-        case (uint8_t)ScreenRotation::Portrait:
-            return IScreen::Rotation::Portrait;
-        case (uint8_t)ScreenRotation::Landscape:
-            return IScreen::Rotation::Landscape;
-        case (uint8_t)ScreenRotation::PortraitFlip:
-            return IScreen::Rotation::PortraitFlip;
-        case (uint8_t)ScreenRotation::LandscapeFlip:
+        case 0x48u:
+            return ScreenRotation::Portrait;
+        case 0xE8u:
+            return ScreenRotation::Landscape;
+        case 0x88u:
+            return ScreenRotation::PortraitFlip;
+        case 0x28u:
         default:
-            return IScreen::Rotation::LandscapeFlip;
+            return ScreenRotation::LandscapeFlip;
     }
 }
 
-FastILI9341::FastILI9341(IDisplayBus& bus) : bus_(bus) {}
-
-void FastILI9341::setSPIFrequency(uint32_t spi_hz) { bus_.setFrequency(spi_hz); }
+FastILI9341::FastILI9341(IDisplayBus& bus) : bus(bus) {}
 
 void FastILI9341::applyBacklightLevel(uint8_t level) {
     backlightLevel = level;
-    bus_.setBacklight(level);
+    bus.setBacklight(level);
 }
 
 void FastILI9341::setBacklight(uint8_t level) {
@@ -44,9 +42,9 @@ void FastILI9341::setBacklight(uint8_t level) {
     applyBacklightLevel(level);
 }
 
-void FastILI9341::setRotation(IScreen::Rotation rotation) { screenRotation(toMadctl(rotation)); }
+void FastILI9341::setRotation(ScreenRotation rotation) { screenRotation(toMadctl(rotation)); }
 
-IScreen::Rotation FastILI9341::rotation() const { return toInterfaceRotation(rotationMadctl_); }
+ScreenRotation FastILI9341::rotation() const { return toInterfaceRotation(rotationMadctl); }
 
 void FastILI9341::fadeBacklightTo(uint8_t targetLevel, uint32_t durationMs) {
     uint8_t startLevel = backlightLevel;
@@ -76,17 +74,17 @@ void FastILI9341::updateBacklightFade() {
 }
 
 bool FastILI9341::begin(uint32_t spi_hz) {
-    return begin(spi_hz, (uint8_t)ScreenRotation::Landscape);
+    return begin(spi_hz, toMadctl(ScreenRotation::Landscape));
 }
 
 static inline uint16_t be16(uint16_t v) { return (uint16_t)((v << 8) | (v >> 8)); }
 
-void FastILI9341::cmd(uint8_t c) { bus_.writeCommand(c); }
+void FastILI9341::cmd(uint8_t c) { bus.writeCommand(c); }
 
-void FastILI9341::data(const uint8_t* d, size_t n) { bus_.writeData(d, n); }
+void FastILI9341::data(const uint8_t* d, size_t n) { bus.writeData(d, n); }
 
-void FastILI9341::streamBegin() { bus_.beginDataWrite(); }
-void FastILI9341::streamEnd() { bus_.endDataWrite(); }
+void FastILI9341::streamBegin() { bus.beginDataWrite(); }
+void FastILI9341::streamEnd() { bus.endDataWrite(); }
 
 void FastILI9341::setWindow(int x0, int y0, int x1, int y1) {
     cmd(0x2A);
@@ -114,17 +112,17 @@ void FastILI9341::scrollTo(uint16_t yOff) {
     data((uint8_t*)&off, 2);
 }
 
-void FastILI9341::hwReset() { bus_.hardwareReset(); }
+void FastILI9341::hwReset() { bus.hardwareReset(); }
 
 void FastILI9341::screenRotation(uint8_t madctl) {
-    rotationMadctl_ = madctl;
+    rotationMadctl = madctl;
     cmd(0x36);  // MADCTL
     data(&madctl, 1);
     updateDimensions(madctl);
 }
 
 bool FastILI9341::begin(uint32_t spi_hz, uint8_t madctl) {
-    if (!bus_.begin(spi_hz)) return false;
+    if (!bus.begin(spi_hz)) return false;
     applyBacklightLevel(backlightLevel);
 
     hwReset();
@@ -153,8 +151,8 @@ bool FastILI9341::begin(uint32_t spi_hz, uint8_t madctl) {
 void FastILI9341::updateDimensions(uint8_t madctl) {
     // Portrait variants (with MV cleared) should expose H x W logical size.
     // Landscape variants (with MV set) expose W x H.
-    bool portrait = (madctl == (uint8_t)ScreenRotation::Portrait) ||
-                    (madctl == (uint8_t)ScreenRotation::PortraitFlip);
+    bool portrait = (madctl == toMadctl(ScreenRotation::Portrait)) ||
+                    (madctl == toMadctl(ScreenRotation::PortraitFlip));
     if (portrait) {
         curW = H;
         curH = W;
@@ -178,7 +176,7 @@ void FastILI9341::fillScreen565(uint16_t color565) {
         int h = (y + STRIP_H <= curH) ? STRIP_H : (curH - y);
         setWindow(0, y, curW - 1, y + h - 1);
         streamBegin();
-        bus_.writeDataChunk((const uint8_t*)strip, (size_t)(curW * h * 2));
+        bus.writeDataChunk((const uint8_t*)strip, (size_t)(curW * h * 2));
         streamEnd();
     }
 }
@@ -225,6 +223,6 @@ void FastILI9341::blit565(int x0, int y0, int w, int h, const uint16_t* pix) {
 
     setWindow(x0, y0, x0 + w - 1, y0 + h - 1);
     streamBegin();
-    bus_.writeDataChunk((const uint8_t*)tmp, (size_t)(n * 2));
+    bus.writeDataChunk((const uint8_t*)tmp, (size_t)(n * 2));
     streamEnd();
 }

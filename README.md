@@ -248,7 +248,7 @@ private:
     configureActions(actionBindings, 1);
 
     gfx.begin(24000000u);
-    gfx.screenRotation(FastILI9341::ScreenRotation::Landscape);
+    gfx.screenRotation(ScreenRotation::Landscape);
     gfx.fillScreen565(Color565::rgb(0, 0, 0));
     switchScene(titleScene);
   }

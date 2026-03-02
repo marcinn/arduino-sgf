@@ -5,19 +5,19 @@
 #include "IFillRect.h"
 #include "Vector2.h"
 
+enum class ScreenRotation : uint8_t {
+    Portrait = 0,
+    Landscape = 1,
+    PortraitFlip = 2,
+    LandscapeFlip = 3,
+};
+
 class IScreen : public IFillRect {
    public:
-    enum class Rotation : uint8_t {
-        Portrait = 0,
-        Landscape = 1,
-        PortraitFlip = 2,
-        LandscapeFlip = 3,
-    };
-
     virtual ~IScreen() = default;
 
-    virtual void setRotation(Rotation rotation) = 0;
-    virtual Rotation rotation() const = 0;
+    virtual void setRotation(ScreenRotation rotation) = 0;
+    virtual ScreenRotation rotation() const = 0;
 
     virtual Vector2i size() const = 0;
 
