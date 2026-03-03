@@ -2,13 +2,13 @@
 
 #include <math.h>
 
-float Physics::gravityOverride = 0.0f;
+Vector2f Physics::gravityOverride{};
 bool Physics::hasGravityOverride = false;
 
 void Physics::integrate(RigidBody& body, float delta) {
     Vector2f velocity = body.getVelocity();
     velocity += (body.accumulatedForce / body.getMass()) * delta;
-    velocity.y += gravity() * delta;
+    velocity += gravity() * delta;
     if (body.getLinearDamp() > 0.0f) {
         float dampFactor = 1.0f - (body.getLinearDamp() * delta);
         if (dampFactor < 0.0f) {
@@ -77,16 +77,16 @@ void Physics::resolveBodies(RigidBody& first, RigidBody& second, float restituti
     second.setVelocity(second.getVelocity() - (impulse / second.getMass()));
 }
 
-void Physics::setGravity(float gravityValue) {
+void Physics::setGravity(const Vector2f& gravityValue) {
     gravityOverride = gravityValue;
     hasGravityOverride = true;
 }
 
 void Physics::clearGravityOverride() { hasGravityOverride = false; }
 
-float Physics::gravity() {
+Vector2f Physics::gravity() {
     if (hasGravityOverride) {
         return gravityOverride;
     }
-    return (float)GRAVITY;
+    return Vector2f{0.0f, (float)GRAVITY};
 }

@@ -3,6 +3,7 @@
 #include "SGF/ActionBinding.h"
 #include "SGF/AreaCollider.h"
 #include "SGF/BitTileCollider.h"
+#include "SGF/BMI160Accel.h"
 #include "SGF/BodiesCollider.h"
 #include "SGF/BufferFillRect.h"
 #include "SGF/CharTileCollider.h"
@@ -50,3 +51,4 @@
 #include "SGF/TextSprite.h"
 #include "SGF/TileFlusher.h"
 #include "SGF/Vector2.h"
+#include "SGF/Vector3.h"

@@ -16,11 +16,11 @@ class Physics {
     static void integrate(RigidBody& body, float delta);
     static void bounce(RigidBody& body, const Vector2f& normal, float restitution);
     static void resolveBodies(RigidBody& first, RigidBody& second, float restitution = 1.0f);
-    static void setGravity(float gravityValue);
+    static void setGravity(const Vector2f& gravityValue);
     static void clearGravityOverride();
 
    private:
-    static float gravity();
-    static float gravityOverride;
+    static Vector2f gravity();
+    static Vector2f gravityOverride;
     static bool hasGravityOverride;
 };
