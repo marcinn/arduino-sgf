@@ -4,6 +4,23 @@
 
 namespace {
 uint16_t be16(uint16_t value) { return (uint16_t)((value << 8) | (value >> 8)); }
+constexpr size_t SWAP_CHUNK_PIXELS = 256u;
+
+void writeSwappedPixels565(IDisplayBus& bus, const uint16_t* pix, size_t count) {
+    uint16_t swapped[SWAP_CHUNK_PIXELS];
+    size_t offset = 0;
+    while (offset < count) {
+        size_t chunk = count - offset;
+        if (chunk > SWAP_CHUNK_PIXELS) {
+            chunk = SWAP_CHUNK_PIXELS;
+        }
+        for (size_t i = 0; i < chunk; i++) {
+            swapped[i] = Color565::bswap(pix[offset + i]);
+        }
+        bus.writePixels565(swapped, chunk);
+        offset += chunk;
+    }
+}
 
 }  // namespace
 
@@ -70,6 +87,10 @@ void FastST7789::data(const uint8_t* bytes, size_t size) { bus.writeData(bytes, 
 void FastST7789::streamBegin() { bus.beginDataWrite(); }
 
 void FastST7789::streamEnd() { bus.endDataWrite(); }
+
+bool FastST7789::pixelWriteExpectsByteSwapped() const {
+    return bus.supportsWritePixels565() && bus.writePixels565ExpectsByteSwapped();
+}
 
 FastST7789::Offset FastST7789::currentOffset() const {
     switch (currentRotation) {
@@ -186,7 +207,8 @@ bool FastST7789::begin(uint32_t spi_hz, ScreenRotation initialRotation) {
 
 void FastST7789::fillScreen565(uint16_t color565) {
     const bool usePixelWrite = bus.supportsWritePixels565();
-    uint16_t color = usePixelWrite ? color565 : Color565::bswap(color565);
+    uint16_t color = (usePixelWrite && !pixelWriteExpectsByteSwapped()) ? color565
+                                                                        : Color565::bswap(color565);
 
     setWindow(0, 0, curW - 1, curH - 1);
     streamBegin();
@@ -227,7 +249,8 @@ void FastST7789::fillRect565(int x0, int y0, int w, int h, uint16_t color565) {
     }
 
     const bool usePixelWrite = bus.supportsWritePixels565();
-    uint16_t color = usePixelWrite ? color565 : Color565::bswap(color565);
+    uint16_t color = (usePixelWrite && !pixelWriteExpectsByteSwapped()) ? color565
+                                                                        : Color565::bswap(color565);
 
     setWindow(x0, y0, x0 + w - 1, y0 + h - 1);
     streamBegin();
@@ -249,13 +272,90 @@ void FastST7789::blit565(int x0, int y0, int w, int h, const uint16_t* pix) {
     const int count = w * h;
     setWindow(x0, y0, x0 + w - 1, y0 + h - 1);
     streamBegin();
-    if (bus.supportsWritePixels565()) {
+    if (bus.supportsWritePixels565() && !pixelWriteExpectsByteSwapped()) {
         bus.writePixels565(pix, (size_t)count);
+    } else if (bus.supportsWritePixels565()) {
+        writeSwappedPixels565(bus, pix, (size_t)count);
     } else {
         for (int i = 0; i < count; i++) {
             uint16_t swapped = Color565::bswap(pix[i]);
             bus.writeDataChunk((const uint8_t*)&swapped, sizeof(swapped));
         }
+    }
+    streamEnd();
+}
+
+void FastST7789::beginBlit565Stream(int x0, int y0, int w, int h) {
+    if (w <= 0 || h <= 0) {
+        return;
+    }
+
+    setWindow(x0, y0, x0 + w - 1, y0 + h - 1);
+    streamBegin();
+}
+
+void FastST7789::writeBlit565StreamChunk(const uint16_t* pix, size_t count) {
+    if (!pix || count == 0u) {
+        return;
+    }
+
+    if (bus.supportsWritePixels565() && !pixelWriteExpectsByteSwapped()) {
+        bus.writePixels565(pix, count);
+        return;
+    }
+
+    if (bus.supportsWritePixels565()) {
+        writeSwappedPixels565(bus, pix, count);
+        return;
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        uint16_t swapped = Color565::bswap(pix[i]);
+            bus.writeDataChunk((const uint8_t*)&swapped, sizeof(swapped));
+    }
+}
+
+bool FastST7789::supportsPreSwappedBlit565Stream() const {
+    return pixelWriteExpectsByteSwapped();
+}
+
+void FastST7789::writePreSwappedBlit565StreamChunk(const uint16_t* pix, size_t count) {
+    if (!pix || count == 0u) {
+        return;
+    }
+
+    if (pixelWriteExpectsByteSwapped()) {
+        bus.writePixels565(pix, count);
+        return;
+    }
+    writeBlit565StreamChunk(pix, count);
+}
+
+bool FastST7789::supportsQueuedPreSwappedBlit565Stream() const {
+    return pixelWriteExpectsByteSwapped() && bus.supportsQueuedWritePixels565();
+}
+
+void FastST7789::waitQueuedPreSwappedBlit565StreamSlot() {
+    if (!supportsQueuedPreSwappedBlit565Stream()) {
+        return;
+    }
+    bus.waitQueuedWritePixels565();
+}
+
+void FastST7789::queuePreSwappedBlit565StreamChunk(const uint16_t* pix, size_t count) {
+    if (!pix || count == 0u) {
+        return;
+    }
+    if (!supportsQueuedPreSwappedBlit565Stream()) {
+        writePreSwappedBlit565StreamChunk(pix, count);
+        return;
+    }
+    bus.queueWritePixels565(pix, count);
+}
+
+void FastST7789::endBlit565Stream() {
+    if (bus.supportsQueuedWritePixels565()) {
+        bus.finishQueuedWritePixels565();
     }
     streamEnd();
 }

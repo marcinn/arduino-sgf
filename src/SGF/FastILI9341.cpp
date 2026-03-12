@@ -221,3 +221,25 @@ void FastILI9341::blit565(int x0, int y0, int w, int h, const uint16_t* pix) {
     }
     streamEnd();
 }
+
+void FastILI9341::beginBlit565Stream(int x0, int y0, int w, int h) {
+    if (w <= 0 || h <= 0) {
+        return;
+    }
+
+    setWindow(x0, y0, x0 + w - 1, y0 + h - 1);
+    streamBegin();
+}
+
+void FastILI9341::writeBlit565StreamChunk(const uint16_t* pix, size_t count) {
+    if (!pix || count == 0u) {
+        return;
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        uint16_t swapped = Color565::bswap(pix[i]);
+        bus.writeDataChunk((const uint8_t*)&swapped, sizeof(swapped));
+    }
+}
+
+void FastILI9341::endBlit565Stream() { streamEnd(); }

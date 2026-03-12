@@ -66,6 +66,15 @@ class FastST7789 : public IRenderTarget, public IScreen {
     void fillScreen565(uint16_t color565) override;
     void fillRect565(int x0, int y0, int w, int h, uint16_t color565) override;
     void blit565(int x0, int y0, int w, int h, const uint16_t* pix) override;
+    bool supportsBlit565Stream() const override { return true; }
+    void beginBlit565Stream(int x0, int y0, int w, int h) override;
+    void writeBlit565StreamChunk(const uint16_t* pix, size_t count) override;
+    bool supportsPreSwappedBlit565Stream() const override;
+    void writePreSwappedBlit565StreamChunk(const uint16_t* pix, size_t count) override;
+    bool supportsQueuedPreSwappedBlit565Stream() const override;
+    void waitQueuedPreSwappedBlit565StreamSlot() override;
+    void queuePreSwappedBlit565StreamChunk(const uint16_t* pix, size_t count) override;
+    void endBlit565Stream() override;
     void setScrollArea(uint16_t topFixed, uint16_t scrollHeight, uint16_t bottomFixed) override;
     void scrollTo(uint16_t yOffset) override;
 
@@ -89,4 +98,5 @@ class FastST7789 : public IRenderTarget, public IScreen {
     void setWindow(int x0, int y0, int x1, int y1);
     void streamBegin();
     void streamEnd();
+    bool pixelWriteExpectsByteSwapped() const;
 };

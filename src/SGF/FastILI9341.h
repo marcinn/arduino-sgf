@@ -43,6 +43,10 @@ class FastILI9341 : public IRenderTarget, public IScreen {
 
     // Blit a row-major RGB565 buffer (native-endian) into a rectangle.
     void blit565(int x0, int y0, int w, int h, const uint16_t* pix) override;
+    bool supportsBlit565Stream() const override { return true; }
+    void beginBlit565Stream(int x0, int y0, int w, int h) override;
+    void writeBlit565StreamChunk(const uint16_t* pix, size_t count) override;
+    void endBlit565Stream() override;
 
     // ILI9341 hardware vertical scroll.
     // top + height + bottom must equal size().y in the current orientation.

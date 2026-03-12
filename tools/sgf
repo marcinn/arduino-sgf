@@ -290,6 +290,7 @@ resolve_env_extra_flags() {
   local name
   local value
   local extra_flags=''
+  local spi_freq_hz
 
   while IFS='=' read -r name value; do
     case "$name" in
@@ -301,6 +302,20 @@ resolve_env_extra_flags() {
         ;;
       PHYSICS_TARGET_FPS|RENDER_TARGET_FPS)
         extra_flags="$extra_flags -D$name=$value"
+        ;;
+      SPI_FREQ)
+        [ -n "$value" ] || continue
+        [[ "$value" =~ ^[0-9]+$ ]] || die "SPI_FREQ must be an integer in MHz or Hz"
+        spi_freq_hz="$value"
+        if [ "$spi_freq_hz" -lt 1000 ]; then
+          spi_freq_hz=$((spi_freq_hz * 1000000))
+        fi
+        extra_flags="$extra_flags -DSGF_ESP32_ST7789_240X240_SPI_HZ=${spi_freq_hz}u"
+        ;;
+      DMA_BUS)
+        [ -n "$value" ] || value=1
+        [[ "$value" =~ ^[01]$ ]] || die "DMA_BUS must be 0 or 1"
+        extra_flags="$extra_flags -DSGF_ESP32_ST7789_240X240_USE_DMA_BUS=$value"
         ;;
     esac
   done < <(env)
