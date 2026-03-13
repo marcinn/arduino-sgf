@@ -300,6 +300,8 @@ Examples:
   $SCRIPT_NAME build board=esp32
   $SCRIPT_NAME build -v board=esp32
   $SCRIPT_NAME build --clean-build board=esp32
+  DEFINES="WOLF_VIEWPORT_W=200 WOLF_VIEWPORT_H=140 WOLF_SIMPLE_FLOOR=1" $SCRIPT_NAME build board=esp32
+  EXTRA_FLAGS="-DWOLF_VIEWPORT_W=200 -DWOLF_VIEWPORT_H=140 -DWOLF_SIMPLE_FLOOR=1" $SCRIPT_NAME build board=esp32
   $SCRIPT_NAME build arduino_ide=/opt/arduino-ide board=esp32
   $SCRIPT_NAME flash board=esp32 port=/dev/ttyUSB0
 EOF
@@ -547,9 +549,32 @@ resolve_env_extra_flags() {
   local value
   local extra_flags=''
   local spi_freq_hz
+  local define
+  local defines_value="${DEFINES:-}"
+  local extra_flags_value="${EXTRA_FLAGS:-}"
+
+  if [ -n "$defines_value" ]; then
+    defines_value="${defines_value//,/ }"
+    for define in $defines_value; do
+      case "$define" in
+        *=*)
+          extra_flags="$extra_flags -D$define"
+          ;;
+        *)
+          extra_flags="$extra_flags -D$define=1"
+          ;;
+      esac
+    done
+  fi
+
+  if [ -n "$extra_flags_value" ]; then
+    extra_flags="$extra_flags $extra_flags_value"
+  fi
 
   while IFS='=' read -r name value; do
     case "$name" in
+      DEFINES|EXTRA_FLAGS)
+        ;;
       ENABLE_[A-Z0-9_]*)
         if [ -z "$value" ]; then
           value=1
