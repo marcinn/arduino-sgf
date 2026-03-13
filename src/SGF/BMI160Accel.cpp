@@ -39,7 +39,7 @@ void BMI160Accel::attach(uint8_t sdaPin, uint8_t sclPin,
 }
 
 bool BMI160Accel::begin() {
-    Wire.begin(sdaPin, sclPin);
+    Wire.begin();
 
     if (!writeRegister(BMI160_COMMAND_REGISTER, BMI160_SOFT_RESET_COMMAND)) {
         return false;

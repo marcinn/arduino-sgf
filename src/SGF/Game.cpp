@@ -4,6 +4,13 @@
 
 #include "Scene.h"
 #include "SceneSwitcher.h"
+#include "SerialMonitor.h"
+
+#if defined(ENABLE_PROFILER) && ENABLE_PROFILER
+#define SGF_ENABLE_PROFILER 1
+#else
+#define SGF_ENABLE_PROFILER 0
+#endif
 
 namespace {
 uint32_t frameIntervalUs(uint32_t fps) {
@@ -14,16 +21,29 @@ uint32_t frameIntervalUs(uint32_t fps) {
 }
 }  // namespace
 
-Game::Game(uint32_t defaultStepUs, uint32_t maxStepUs) {
+Game::Game(uint32_t defaultStepUs, uint32_t maxStepUs)
+    : gameProfiler("Game", profilerSlots, PROFILER_SLOT_COUNT) {
     physicsClock.lastUs = 0;
     physicsClock.defaultStepUs = defaultStepUs;
     physicsClock.maxStepUs = maxStepUs;
+
+#if SGF_ENABLE_PROFILER
+    gameProfiler.setLabel(LoopCountSlot, "loop_calls");
+    gameProfiler.setLabel(ProcessCountSlot, "process_calls");
+    gameProfiler.setLabel(PhysicsCountSlot, "physics_calls");
+    gameProfiler.setLabel(RenderCountSlot, "render_calls");
+#endif
 }
 
 void Game::start() {
     physicsClock.lastUs = 0;
     lastProcessUs = 0;
     lastRenderUs = 0;
+#if SGF_ENABLE_PROFILER
+    if (serialMonitor) {
+        serialMonitor->begin();
+    }
+#endif
     onSetup();
     resetClock();
     resetActions();
@@ -31,9 +51,16 @@ void Game::start() {
 
 void Game::loop() {
     uint32_t nowUs = micros();
+#if SGF_ENABLE_PROFILER
+    gameProfiler.increment(LoopCountSlot);
+#endif
+
     float processDelta = processSeconds(nowUs);
     onProcess(processDelta);
     sceneSwitcher.onProcess(processDelta);
+#if SGF_ENABLE_PROFILER
+    gameProfiler.increment(ProcessCountSlot);
+#endif
 
     uint32_t physicsInterval = frameIntervalUs(PHYSICS_TARGET_FPS);
     if (physicsInterval == 0 || nowUs - physicsClock.lastUs >= physicsInterval) {
@@ -41,13 +68,24 @@ void Game::loop() {
         updateActionStates();
         onPhysics(delta);
         sceneSwitcher.onPhysics(delta);
+#if SGF_ENABLE_PROFILER
+        gameProfiler.increment(PhysicsCountSlot);
+#endif
     }
 
     uint32_t renderInterval = frameIntervalUs(RENDER_TARGET_FPS);
     if (renderer && (renderInterval == 0 || nowUs - lastRenderUs >= renderInterval)) {
         lastRenderUs = nowUs;
         renderer->render();
+#if SGF_ENABLE_PROFILER
+        gameProfiler.increment(RenderCountSlot);
+#endif
     }
+#if SGF_ENABLE_PROFILER
+    if (serialMonitor) {
+        serialMonitor->tick();
+    }
+#endif
 }
 
 void Game::resetClock() {
@@ -68,6 +106,15 @@ const Scene* Game::currentScene() const {
 
 bool Game::hasCurrentScene() const {
     return sceneSwitcher.hasCurrent();
+}
+
+void Game::attachSerialMonitor(SerialMonitor& serialMonitor) {
+#if SGF_ENABLE_PROFILER
+    this->serialMonitor = &serialMonitor;
+    serialMonitor.attachProfiler(gameProfiler);
+#else
+    (void)serialMonitor;
+#endif
 }
 
 void Game::resetActions() {

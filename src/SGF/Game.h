@@ -14,13 +14,23 @@
 #include "ActionState.h"
 #include "ActionBinding.h"
 #include "InputEvent.h"
+#include "Profiler.h"
 #include "IRenderer.h"
 #include "SceneSwitcher.h"
 
 class Scene;
+class SerialMonitor;
 
 class Game {
     public:
+    enum ProfilerSlot {
+        LoopCountSlot = 0,
+        ProcessCountSlot,
+        PhysicsCountSlot,
+        RenderCountSlot,
+        PROFILER_SLOT_COUNT
+    };
+
     Game(uint32_t defaultStepUs, uint32_t maxStepUs);
     virtual ~Game() = default;
 
@@ -31,6 +41,9 @@ class Game {
     const Scene* currentScene() const;
     bool hasCurrentScene() const;
     void resetActions();
+    Profiler& profiler() { return gameProfiler; }
+    const Profiler& profiler() const { return gameProfiler; }
+    void attachSerialMonitor(SerialMonitor& serialMonitor);
 
     protected:
     virtual void onSetup() = 0;
@@ -58,6 +71,9 @@ class Game {
     InputEvent currentInputEvent;
     IRenderer* renderer = nullptr;
     SceneSwitcher sceneSwitcher;
+    Profiler::Slot profilerSlots[PROFILER_SLOT_COUNT]{};
+    Profiler gameProfiler;
+    SerialMonitor* serialMonitor = nullptr;
 
     void resetClock();
     void updateActionStates();

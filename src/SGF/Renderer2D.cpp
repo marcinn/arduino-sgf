@@ -8,6 +8,13 @@
 #include "Color565.h"
 #include "Font5x7.h"
 #include "FontRenderer.h"
+#include "Math.h"
+
+#if defined(ENABLE_PROFILER) && ENABLE_PROFILER
+#define SGF_ENABLE_PROFILER 1
+#else
+#define SGF_ENABLE_PROFILER 0
+#endif
 
 namespace {
 #ifdef ENABLE_FPS
@@ -17,6 +24,7 @@ constexpr int FPS_TEXT_WIDTH = (9 * 6 * FPS_TEXT_SCALE) - FPS_TEXT_SCALE;
 constexpr int FPS_OVERLAY_WIDTH = FPS_TEXT_WIDTH + (FPS_PADDING * 2);
 constexpr int FPS_OVERLAY_HEIGHT = (7 * FPS_TEXT_SCALE) + (FPS_PADDING * 2);
 constexpr uint32_t FPS_UPDATE_INTERVAL_MS = 500;
+constexpr int FPS_DISPLAY_MAX = 99999;
 #endif
 
 static void blitSubRectRows(IRenderTarget& target, int dstX, int dstY, int w, int h,
@@ -141,9 +149,18 @@ Renderer2D::Renderer2D(IRenderTarget& target, DirtyRects& dirty, int tileW, int 
       dirty(dirty),
       flusher(dirty, tileW, tileH),
       tileW(tileW),
-      tileH(tileH) {}
+      tileH(tileH),
+      rendererProfiler("Renderer2D", profilerSlots, PROFILER_SLOT_COUNT) {
+#if SGF_ENABLE_PROFILER
+    rendererProfiler.setLabel(RenderCountSlot, "render_calls");
+    rendererProfiler.setLabel(FlushCountSlot, "flush_calls");
+#endif
+}
 
 void Renderer2D::render() {
+#if SGF_ENABLE_PROFILER
+    rendererProfiler.increment(RenderCountSlot);
+#endif
 #ifdef ENABLE_FPS
     updateFps();
     if (fpsOverlayDirty) {
@@ -307,8 +324,13 @@ static int32_t worldOffsetFromScreenCoord(const HardwareScroller& scroller, int 
 }
 
 void Renderer2D::flush(uint16_t* regionBuf) {
+#if SGF_ENABLE_PROFILER
+    rendererProfiler.increment(FlushCountSlot);
+#endif
     target.tickEffects();
-    if (!regionBuf) return;
+    if (!regionBuf) {
+        return;
+    }
 
     trackSpriteChanges();
 
@@ -350,7 +372,8 @@ void Renderer2D::updateFps() {
         return;
     }
 
-    uint16_t newFpsValue = (uint16_t)((fpsFrameCount * 1000u) / elapsed);
+    uint32_t newFpsValue = (fpsFrameCount * 1000u) / elapsed;
+    newFpsValue = (uint32_t)Math::clamp((int)newFpsValue, 0, FPS_DISPLAY_MAX);
     if (newFpsValue != fpsValue) {
         fpsValue = newFpsValue;
         fpsOverlayDirty = true;
@@ -368,7 +391,7 @@ void Renderer2D::renderFpsOverlay(int x0, int y0, int w, int h, uint16_t* buf) {
     fillRect.fillRect565(0, 0, FPS_OVERLAY_WIDTH, FPS_OVERLAY_HEIGHT, Color565::rgb(0, 0, 0));
 
     char text[] = "FPS:     ";
-    uint16_t value = fpsValue;
+    uint32_t value = fpsValue;
     text[8] = (char)('0' + (value % 10));
     value /= 10;
     if (value != 0) {

@@ -177,13 +177,19 @@ sgf info
 sgf clean board=esp32
 ```
 
-Exported `ENABLE_*` variables are forwarded as preprocessor defines. `PHYSICS_TARGET_FPS` and `RENDER_TARGET_FPS` are also forwarded. Example:
+Exported `ENABLE_*` variables are forwarded as preprocessor defines. `PHYSICS_TARGET_FPS`,
+`RENDER_TARGET_FPS`, `SPI_FREQ`, and `DMA_BUS` are also forwarded. Example:
 
 ```bash
 ENABLE_CTRL4B=1 sgf flash board=esp32 port=/dev/ttyUSB0
 ```
 
-`ENABLE_FPS=1` enables a small FPS overlay rendered by `Renderer2D` as the top-most debug layer in the normal render pipeline.
+Useful flags during bring-up and profiling:
+- `SPI_FREQ=60` sets SPI frequency to 60 MHz (the helper also accepts raw Hz values).
+- `RENDER_TARGET_FPS=0` disables the render cap.
+- `DMA_BUS=1` enables the alternate DMA bus define used by supported ESP32 ST7789 presets.
+- `ENABLE_PROFILER=1` enables SGF `Profiler` + `SerialMonitor` output in the game loop.
+- `ENABLE_FPS=1` enables the on-screen FPS overlay rendered by `Renderer2D`.
 
 `PHYSICS_TARGET_FPS` and `RENDER_TARGET_FPS` default to `60`. They cap the `Game` physics tick rate and render rate independently. Set either to `0` to disable that limit.
 

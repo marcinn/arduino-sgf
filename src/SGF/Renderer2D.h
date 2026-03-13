@@ -6,6 +6,7 @@
 #include <functional>
 
 #include "DirtyRects.h"
+#include "Profiler.h"
 #include "IRenderer.h"
 #include "IRenderTarget.h"
 #include "Scroller.h"
@@ -17,6 +18,12 @@
 // sprite overlay, and dirty-tile flushing.
 class Renderer2D : public IRenderer {
    public:
+    enum ProfilerSlot {
+        RenderCountSlot = 0,
+        FlushCountSlot,
+        PROFILER_SLOT_COUNT
+    };
+
     class SpriteHandle {
        public:
         SpriteHandle() = default;
@@ -121,6 +128,8 @@ class Renderer2D : public IRenderer {
     // `regionBuf` must contain at least tileW*tileH pixels.
     void flush(uint16_t* regionBuf);
     void render() override;
+    Profiler& profiler() { return rendererProfiler; }
+    const Profiler& profiler() const { return rendererProfiler; }
 
    private:
     IRenderTarget& target;
@@ -140,10 +149,12 @@ class Renderer2D : public IRenderer {
         uint32_t redrawRevision = 0;
     };
     std::array<SpriteSnapshot, SpriteLayer::MAX_SPRITES> spriteSnapshots{};
+    Profiler::Slot profilerSlots[PROFILER_SLOT_COUNT]{};
+    Profiler rendererProfiler;
 #ifdef ENABLE_FPS
     uint32_t fpsWindowStartMs = 0;
     uint16_t fpsFrameCount = 0;
-    uint16_t fpsValue = 0;
+    uint32_t fpsValue = 0;
     bool fpsOverlayDirty = false;
 #endif
 
