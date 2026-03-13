@@ -3,6 +3,9 @@ set -euo pipefail
 
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_NAME="$(basename "$0")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+SGF_LIB_ROOT="$(readlink -f "$SCRIPT_DIR/..")"
+SGF_LIB_PARENT="$(dirname "$SGF_LIB_ROOT")"
 
 SUPPORTED_BOARDS=(unoq esp32)
 
@@ -18,13 +21,264 @@ trim() {
   printf '%s' "$value"
 }
 
+basename_or_self() {
+  local path="$1"
+  if [ -z "$path" ]; then
+    printf '%s' "$path"
+    return
+  fi
+  printf '%s' "${path##*/}"
+}
+
+dirname_or_self() {
+  local path="$1"
+  if [ -z "$path" ]; then
+    printf '%s' "$path"
+    return
+  fi
+  if [[ "$path" != */* ]]; then
+    printf '.'
+    return
+  fi
+  printf '%s' "${path%/*}"
+}
+
+extract_command_source() {
+  local line="$1"
+  local token
+  local previous=''
+
+  for token in $line; do
+    if [ "$previous" = "-o" ]; then
+      break
+    fi
+    case "$token" in
+      *.ino|*.c|*.cc|*.cpp|*.cxx|*.S)
+        printf '%s' "$token"
+        return
+        ;;
+    esac
+    previous="$token"
+  done
+}
+
+extract_link_output() {
+  local line="$1"
+  local token
+  local previous=''
+
+  for token in $line; do
+    if [ "$previous" = "-o" ]; then
+      printf '%s' "$token"
+      return
+    fi
+    previous="$token"
+  done
+}
+
+source_label() {
+  local src="$1"
+  local dir
+
+  case "$src" in
+    */build/*/sketch/*)
+      printf '%s' "$(basename_or_self "$src")"
+      return
+      ;;
+    "$SGF_LIB_ROOT"/src/SGF/*)
+      printf 'SGF/%s' "$(basename_or_self "$src")"
+      return
+      ;;
+    "$SGF_LIB_PARENT"/sgf-esp32/src/SGF/*)
+      printf 'sgf-esp32/%s' "$(basename_or_self "$src")"
+      return
+      ;;
+    "$SGF_LIB_PARENT"/sgf-hardware-presets/*)
+      dir="$(basename_or_self "$(dirname_or_self "$src")")"
+      printf 'sgf-hardware-presets/%s/%s' "$dir" "$(basename_or_self "$src")"
+      return
+      ;;
+    "$PWD"/libraries/SGF/src/SGF/*)
+      printf 'SGF/%s' "$(basename_or_self "$src")"
+      return
+      ;;
+    "$PWD"/libraries/sgf-esp32/src/SGF/*)
+      printf 'sgf-esp32/%s' "$(basename_or_self "$src")"
+      return
+      ;;
+    "$PWD"/libraries/sgf-hardware-presets/*)
+      dir="$(basename_or_self "$(dirname_or_self "$src")")"
+      printf 'sgf-hardware-presets/%s/%s' "$dir" "$(basename_or_self "$src")"
+      return
+      ;;
+    */build/*/libraries/SGF/SGF/*)
+      printf 'SGF/%s' "$(basename_or_self "$src")"
+      return
+      ;;
+    */build/*/libraries/sgf-esp32/SGF/*)
+      printf 'sgf-esp32/%s' "$(basename_or_self "$src")"
+      return
+      ;;
+    */build/*/libraries/sgf-hardware-presets/*)
+      dir="$(basename_or_self "$(dirname_or_self "$src")")"
+      printf 'sgf-hardware-presets/%s/%s' "$dir" "$(basename_or_self "$src")"
+      return
+      ;;
+    */build/*/libraries/*)
+      dir="$(basename_or_self "$(dirname_or_self "$src")")"
+      printf '%s/%s' "$dir" "$(basename_or_self "$src")"
+      return
+      ;;
+    *)
+      printf '%s' "$(basename_or_self "$src")"
+      return
+      ;;
+  esac
+}
+
+is_local_compile_source() {
+  local src="$1"
+  case "$src" in
+    */build/*/sketch/*|*/build/*/libraries/SGF/*|*/build/*/libraries/sgf-esp32/*|*/build/*/libraries/sgf-hardware-presets/*|"$SGF_LIB_ROOT"/*|"$SGF_LIB_PARENT"/sgf-esp32/*|"$SGF_LIB_PARENT"/sgf-hardware-presets/*|"$PWD"/libraries/SGF/*|"$PWD"/libraries/sgf-esp32/*|"$PWD"/libraries/sgf-hardware-presets/*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+emit_pretty_line() {
+  local line="$1"
+  local src
+  local out
+  local label
+
+  case "$line" in
+    *" -E -CC "*)
+      printf '[PREP] Resolving includes...\n'
+      return 0
+      ;;
+    *" -MMD -c "*)
+      src="$(extract_command_source "$line")"
+      if ! is_local_compile_source "$src"; then
+        printf '[CORE] Compiling Arduino core and external libraries...\n'
+        return 0
+      fi
+      label="$(source_label "$src")"
+      if [[ "$line" == *"g++ -MMD -c "* ]]; then
+        printf '[CXX] %s\n' "$label"
+      else
+        printf '[CC] %s\n' "$label"
+      fi
+      return 0
+      ;;
+    *" ar "*".a "*|*"gcc-ar "*".a "*)
+      return 0
+      ;;
+    *"g++ "*".elf"*|*"gcc "*".elf"*|*"ld "*".elf"*)
+      out="$(extract_link_output "$line")"
+      printf '[LD] %s\n' "$(basename_or_self "$out")"
+      return 0
+      ;;
+    "Detecting libraries used..."*)
+      printf '[DEPS] Detecting libraries used...\n'
+      return 0
+      ;;
+    "Using board "*)
+      printf '[CFG] %s\n' "$line"
+      return 0
+      ;;
+    "Using core "*)
+      printf '[CFG] %s\n' "$line"
+      return 0
+      ;;
+    "FQBN: "*)
+      printf '[CFG] %s\n' "$line"
+      return 0
+      ;;
+    "Sketch uses "*|"Global variables use "*)
+      printf '%s\n' "$line"
+      return 0
+      ;;
+    "esptool v"*|"Creating ESP32 image..."|"Merged "*|"Successfully created ESP32 image."*)
+      printf '[IMG] %s\n' "$line"
+      return 0
+      ;;
+    "Alternatives for "*|"ResolveLibrary("*|"  -> candidates:"*)
+      return 0
+      ;;
+    *"bash -c "*)
+      return 0
+      ;;
+    "loading library from "*)
+      printf '[WARN] %s\n' "$line"
+      return 0
+      ;;
+    *": error: "*|*": fatal error: "*|*": warning: "*|*": note: "*)
+      printf '%s\n' "$line"
+      return 0
+      ;;
+    "Error during build:"*)
+      printf '%s\n' "$line"
+      return 0
+      ;;
+  esac
+
+  return 0
+}
+
+run_arduino_cli() {
+  local cli="$1"
+  shift
+  local line
+  local cmd_status
+  local emitted_prep=0
+  local emitted_core=0
+  local src
+
+  if [ "$CLI_VERBOSE" -eq 1 ]; then
+    "$cli" "$@"
+    return
+  fi
+
+  set +e
+  "$cli" "$@" 2>&1 | while IFS= read -r line; do
+    case "$line" in
+      *" -E -CC "*)
+        if [ "$emitted_prep" -eq 0 ]; then
+          emit_pretty_line "$line"
+          emitted_prep=1
+        fi
+        ;;
+      *" -MMD -c "*)
+        src="$(extract_command_source "$line")"
+        if is_local_compile_source "$src"; then
+          emit_pretty_line "$line"
+        else
+          if [ "$emitted_core" -eq 0 ]; then
+            emit_pretty_line "$line"
+            emitted_core=1
+          fi
+        fi
+        ;;
+      *)
+        emit_pretty_line "$line"
+        ;;
+    esac
+  done
+  cmd_status=${PIPESTATUS[0]}
+  set -e
+  return "$cmd_status"
+}
+
 usage() {
   cat <<EOF
 Usage:
   $SCRIPT_NAME init [target_dir] [--name PROJECT_NAME] [--force]
-  $SCRIPT_NAME build [board=NAME] [port=/dev/ttyXXX] [monitor_config=115200] [arduino_ide=/path]
-  $SCRIPT_NAME flash [board=NAME] [port=/dev/ttyXXX] [arduino_ide=/path]
-  $SCRIPT_NAME upload [board=NAME] [port=/dev/ttyXXX] [arduino_ide=/path]
+  $SCRIPT_NAME build [board=NAME] [port=/dev/ttyXXX] [monitor_config=115200] [arduino_ide=/path] [--clean-build] [-v|--verbose]
+  $SCRIPT_NAME flash [board=NAME] [port=/dev/ttyXXX] [arduino_ide=/path] [--clean-build] [-v|--verbose]
+  $SCRIPT_NAME upload [board=NAME] [port=/dev/ttyXXX] [arduino_ide=/path] [--clean-build] [-v|--verbose]
   $SCRIPT_NAME monitor [board=NAME] [port=/dev/ttyXXX] [monitor_config=115200] [arduino_ide=/path]
   $SCRIPT_NAME boards
   $SCRIPT_NAME info [board=NAME] [arduino_ide=/path]
@@ -44,6 +298,8 @@ Optional local Arduino libraries:
 Examples:
   $SCRIPT_NAME init .
   $SCRIPT_NAME build board=esp32
+  $SCRIPT_NAME build -v board=esp32
+  $SCRIPT_NAME build --clean-build board=esp32
   $SCRIPT_NAME build arduino_ide=/opt/arduino-ide board=esp32
   $SCRIPT_NAME flash board=esp32 port=/dev/ttyUSB0
 EOF
@@ -345,6 +601,8 @@ CLI_BOARD=''
 CLI_PORT=''
 CLI_MONITOR_CONFIG=''
 CLI_ARDUINO_IDE=''
+CLI_CLEAN_BUILD=0
+CLI_VERBOSE=0
 CLI_ARGS=()
 
 parse_runtime_args() {
@@ -352,6 +610,8 @@ parse_runtime_args() {
   CLI_PORT=''
   CLI_MONITOR_CONFIG=''
   CLI_ARDUINO_IDE=''
+  CLI_CLEAN_BUILD=0
+  CLI_VERBOSE=0
   CLI_ARGS=()
 
   while [ "$#" -gt 0 ]; do
@@ -387,6 +647,12 @@ parse_runtime_args() {
         [ "$#" -ge 2 ] || die "--arduino-ide requires a value"
         CLI_ARDUINO_IDE="$2"
         shift
+        ;;
+      --clean-build)
+        CLI_CLEAN_BUILD=1
+        ;;
+      -v|--verbose)
+        CLI_VERBOSE=1
         ;;
       *)
         CLI_ARGS+=("$1")
@@ -430,19 +696,29 @@ resolve_selected_monitor_config() {
 
 stage_project() {
   local board="$1"
+  local clean_build="${2:-0}"
   local stage_root="$PWD/build-stage/$board"
   local stage_dir="$stage_root/$SKETCH_NAME"
   local file
   local dir
   local has_sources=0
 
-  rm -rf "$stage_root"
+  if [ "$clean_build" -eq 1 ]; then
+    rm -rf "$stage_root"
+  fi
   mkdir -p "$stage_dir"
+
+  shopt -s nullglob
+  for file in "$stage_dir"/*; do
+    [ -L "$file" ] || continue
+    [ -e "$file" ] || rm -f "$file"
+  done
+  shopt -u nullglob
 
   shopt -s nullglob
   for file in *.ino *.cpp *.c *.h *.hpp; do
     [ -e "$file" ] || continue
-    ln -s "$PWD/$file" "$stage_dir/$file"
+    ln -sfn "$PWD/$file" "$stage_dir/$file"
     has_sources=1
   done
   shopt -u nullglob
@@ -463,7 +739,7 @@ stage_project() {
     if find "$dir" -type f \
       \( -name '*.ino' -o -name '*.cpp' -o -name '*.c' -o -name '*.h' -o -name '*.hpp' \) \
       -print -quit | grep -q .; then
-      ln -s "$PWD/$dir" "$stage_dir/$dir"
+      ln -sfn "$PWD/$dir" "$stage_dir/$dir"
     fi
   done
   shopt -u nullglob
@@ -476,6 +752,7 @@ run_compile() {
   local fqbn="$2"
   local board_options="$3"
   local build_extra_flags="$4"
+  local clean_build="${5:-0}"
   local build_dir="$PWD/build/$board"
   local stage_dir
   local arduino_cli
@@ -483,14 +760,18 @@ run_compile() {
   local compile_args=()
 
   arduino_cli="$(find_arduino_cli)"
-  stage_dir="$(stage_project "$board")"
+  stage_dir="$(stage_project "$board" "$clean_build")"
 
   compile_args+=(
     compile
-    --clean
+    --verbose
     --warnings all
     --fqbn "$fqbn"
   )
+
+  if [ "$clean_build" -eq 1 ]; then
+    compile_args+=(--clean)
+  fi
 
   if [ -n "$board_options" ]; then
     compile_args+=(--board-options "$board_options")
@@ -510,7 +791,7 @@ run_compile() {
   fi
 
   compile_args+=("$stage_dir")
-  "$arduino_cli" "${compile_args[@]}"
+  run_arduino_cli "$arduino_cli" "${compile_args[@]}"
 }
 
 run_upload() {
@@ -533,6 +814,10 @@ run_upload() {
     --build-path "$build_dir"
     --port "$port"
   )
+
+  if [ "$CLI_VERBOSE" -eq 1 ]; then
+    upload_args+=(--verbose)
+  fi
 
   if [ -n "$board_options" ]; then
     upload_args+=(--board-options "$board_options")
@@ -564,6 +849,10 @@ run_monitor() {
     --fqbn "$fqbn"
     --port "$port"
   )
+
+  if [ "$CLI_VERBOSE" -eq 1 ]; then
+    monitor_args+=(--verbose)
+  fi
 
   if [ -n "$board_options" ]; then
     monitor_args+=(--board-options "$board_options")
@@ -601,10 +890,10 @@ command_build_like() {
 
   case "$action" in
     build)
-      run_compile "$board" "$fqbn" "$board_options" "$build_extra_flags"
+      run_compile "$board" "$fqbn" "$board_options" "$build_extra_flags" "$CLI_CLEAN_BUILD"
       ;;
     upload|flash)
-      run_compile "$board" "$fqbn" "$board_options" "$build_extra_flags"
+      run_compile "$board" "$fqbn" "$board_options" "$build_extra_flags" "$CLI_CLEAN_BUILD"
       run_upload "$board" "$fqbn" "$board_options" "$port"
       ;;
     monitor)

@@ -126,7 +126,15 @@ void SerialMonitor::dumpProfiler(const Profiler& profiler) {
         Serial.print(' ');
         printSlotLabel(profiler, slot);
         Serial.print('=');
-        Serial.print(value);
+        if (mode == Profiler::SampleSlot) {
+            uint32_t avgUs = profiler.average(slot);
+            Serial.print(avgUs / 1000u);
+            Serial.print('.');
+            Serial.print((avgUs % 1000u) / 100u);
+            Serial.print("ms");
+        } else {
+            Serial.print(value);
+        }
     }
 
     Serial.println();
