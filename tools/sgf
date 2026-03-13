@@ -242,6 +242,18 @@ run_arduino_cli() {
     return
   fi
 
+  if [ "$CLI_QUIET" -eq 1 ]; then
+    local output
+    set +e
+    output="$("$cli" "$@" 2>&1)"
+    cmd_status=$?
+    set -e
+    if [ "$cmd_status" -ne 0 ]; then
+      printf '%s\n' "$output"
+    fi
+    return "$cmd_status"
+  fi
+
   set +e
   "$cli" "$@" 2>&1 | while IFS= read -r line; do
     case "$line" in
@@ -276,9 +288,10 @@ usage() {
   cat <<EOF
 Usage:
   $SCRIPT_NAME init [target_dir] [--name PROJECT_NAME] [--force]
-  $SCRIPT_NAME build [board=NAME] [port=/dev/ttyXXX] [monitor_config=115200] [arduino_ide=/path] [--clean-build] [-v|--verbose]
-  $SCRIPT_NAME flash [board=NAME] [port=/dev/ttyXXX] [arduino_ide=/path] [--clean-build] [-v|--verbose]
-  $SCRIPT_NAME upload [board=NAME] [port=/dev/ttyXXX] [arduino_ide=/path] [--clean-build] [-v|--verbose]
+  $SCRIPT_NAME build [board=NAME] [port=/dev/ttyXXX] [monitor_config=115200] [arduino_ide=/path] [--clean-build] [-v|--verbose] [-q|--quiet]
+  $SCRIPT_NAME elfinfo [board=NAME] [port=/dev/ttyXXX] [monitor_config=115200] [arduino_ide=/path] [--build] [--clean-build] [-v|--verbose] [-q|--quiet] [--units b|kb|mb|auto]
+  $SCRIPT_NAME flash [board=NAME] [port=/dev/ttyXXX] [arduino_ide=/path] [--clean-build] [-v|--verbose] [-q|--quiet]
+  $SCRIPT_NAME upload [board=NAME] [port=/dev/ttyXXX] [arduino_ide=/path] [-v|--verbose] [-q|--quiet]
   $SCRIPT_NAME monitor [board=NAME] [port=/dev/ttyXXX] [monitor_config=115200] [arduino_ide=/path]
   $SCRIPT_NAME boards
   $SCRIPT_NAME info [board=NAME] [arduino_ide=/path]
@@ -299,11 +312,15 @@ Examples:
   $SCRIPT_NAME init .
   $SCRIPT_NAME build board=esp32
   $SCRIPT_NAME build -v board=esp32
+  $SCRIPT_NAME build -q board=esp32
   $SCRIPT_NAME build --clean-build board=esp32
-  DEFINES="WOLF_VIEWPORT_W=200 WOLF_VIEWPORT_H=140 WOLF_SIMPLE_FLOOR=1" $SCRIPT_NAME build board=esp32
-  EXTRA_FLAGS="-DWOLF_VIEWPORT_W=200 -DWOLF_VIEWPORT_H=140 -DWOLF_SIMPLE_FLOOR=1" $SCRIPT_NAME build board=esp32
+  $SCRIPT_NAME elfinfo -q --units kb board=esp32
+  $SCRIPT_NAME elfinfo --build --clean-build board=esp32
+  DEFINES="APP_FEATURE=1 APP_WIDTH=200 APP_HEIGHT=140" $SCRIPT_NAME build board=esp32
+  EXTRA_FLAGS="-DAPP_FEATURE=1 -DAPP_WIDTH=200 -DAPP_HEIGHT=140" $SCRIPT_NAME build board=esp32
   $SCRIPT_NAME build arduino_ide=/opt/arduino-ide board=esp32
   $SCRIPT_NAME flash board=esp32 port=/dev/ttyUSB0
+  $SCRIPT_NAME upload board=esp32 port=/dev/ttyUSB0
 EOF
 }
 
@@ -627,7 +644,10 @@ CLI_PORT=''
 CLI_MONITOR_CONFIG=''
 CLI_ARDUINO_IDE=''
 CLI_CLEAN_BUILD=0
+CLI_BUILD=0
 CLI_VERBOSE=0
+CLI_QUIET=0
+CLI_UNITS='auto'
 CLI_ARGS=()
 
 parse_runtime_args() {
@@ -636,7 +656,10 @@ parse_runtime_args() {
   CLI_MONITOR_CONFIG=''
   CLI_ARDUINO_IDE=''
   CLI_CLEAN_BUILD=0
+  CLI_BUILD=0
   CLI_VERBOSE=0
+  CLI_QUIET=0
+  CLI_UNITS='auto'
   CLI_ARGS=()
 
   while [ "$#" -gt 0 ]; do
@@ -676,8 +699,22 @@ parse_runtime_args() {
       --clean-build)
         CLI_CLEAN_BUILD=1
         ;;
+      --build)
+        CLI_BUILD=1
+        ;;
+      --units=*)
+        CLI_UNITS="${1#--units=}"
+        ;;
+      --units)
+        [ "$#" -ge 2 ] || die "--units requires a value"
+        CLI_UNITS="$2"
+        shift
+        ;;
       -v|--verbose)
         CLI_VERBOSE=1
+        ;;
+      -q|--quiet)
+        CLI_QUIET=1
         ;;
       *)
         CLI_ARGS+=("$1")
@@ -685,6 +722,14 @@ parse_runtime_args() {
     esac
     shift
   done
+
+  case "$CLI_UNITS" in
+    auto|b|kb|mb)
+      ;;
+    *)
+      die "--units must be one of: b, kb, mb, auto"
+      ;;
+  esac
 }
 
 resolve_selected_board() {
@@ -719,6 +764,23 @@ resolve_selected_monitor_config() {
   printf '%s' '115200'
 }
 
+ensure_symlink() {
+  local target="$1"
+  local link_path="$2"
+  local current=''
+
+  if [ -L "$link_path" ]; then
+    current="$(readlink "$link_path" 2>/dev/null || true)"
+    if [ "$current" = "$target" ]; then
+      return
+    fi
+  elif [ -e "$link_path" ]; then
+    rm -rf "$link_path"
+  fi
+
+  ln -sfn "$target" "$link_path"
+}
+
 stage_project() {
   local board="$1"
   local clean_build="${2:-0}"
@@ -743,7 +805,7 @@ stage_project() {
   shopt -s nullglob
   for file in *.ino *.cpp *.c *.h *.hpp; do
     [ -e "$file" ] || continue
-    ln -sfn "$PWD/$file" "$stage_dir/$file"
+    ensure_symlink "$PWD/$file" "$stage_dir/$file"
     has_sources=1
   done
   shopt -u nullglob
@@ -764,7 +826,7 @@ stage_project() {
     if find "$dir" -type f \
       \( -name '*.ino' -o -name '*.cpp' -o -name '*.c' -o -name '*.h' -o -name '*.hpp' \) \
       -print -quit | grep -q .; then
-      ln -sfn "$PWD/$dir" "$stage_dir/$dir"
+      ensure_symlink "$PWD/$dir" "$stage_dir/$dir"
     fi
   done
   shopt -u nullglob
@@ -785,6 +847,7 @@ run_compile() {
   local compile_args=()
 
   arduino_cli="$(find_arduino_cli)"
+  run_project_prebuild "$board"
   stage_dir="$(stage_project "$board" "$clean_build")"
 
   compile_args+=(
@@ -819,6 +882,325 @@ run_compile() {
   run_arduino_cli "$arduino_cli" "${compile_args[@]}"
 }
 
+run_project_prebuild() {
+  local board="$1"
+  local hook="$PWD/tools/sgf-prebuild"
+  local py_hook="$PWD/tools/sgf-prebuild.py"
+
+  if [ -x "$hook" ]; then
+    SGF_BOARD="$board" SGF_PROJECT_DIR="$PWD" "$hook"
+    return
+  fi
+
+  if [ -f "$py_hook" ]; then
+    command -v python3 >/dev/null 2>&1 || die "python3 is required for tools/sgf-prebuild.py"
+    SGF_BOARD="$board" SGF_PROJECT_DIR="$PWD" python3 "$py_hook"
+    return
+  fi
+}
+
+find_size_tool() {
+  local board="$1"
+  local candidate=''
+
+  case "$board" in
+    esp32)
+      candidate="$(command -v xtensa-esp-elf-size 2>/dev/null || true)"
+      if [ -n "$candidate" ]; then
+        printf '%s' "$candidate"
+        return
+      fi
+      candidate="$HOME/.arduino15/packages/esp32/tools/esp-x32/2511/bin/xtensa-esp-elf-size"
+      [ -x "$candidate" ] || die "xtensa-esp-elf-size not found for board '$board'"
+      printf '%s' "$candidate"
+      ;;
+    *)
+      candidate="$(command -v size 2>/dev/null || true)"
+      [ -n "$candidate" ] || die "'size' tool not found for board '$board'"
+      printf '%s' "$candidate"
+      ;;
+  esac
+}
+
+board_flash_limit_bytes() {
+  case "$1" in
+    esp32) printf '%s' '1310720' ;;
+    *)
+      printf '%s' '0'
+      ;;
+  esac
+}
+
+board_dram_limit_bytes() {
+  case "$1" in
+    esp32) printf '%s' '327680' ;;
+    *)
+      printf '%s' '0'
+      ;;
+  esac
+}
+
+board_static_dram_limit_bytes() {
+  case "$1" in
+    esp32) printf '%s' '124580' ;;
+    *)
+      printf '%s' '0'
+      ;;
+  esac
+}
+
+run_elfinfo() {
+  local board="$1"
+  local build_dir="$PWD/build/$board"
+  local elf_path="$build_dir/$ENTRYPOINT.elf"
+  local map_path="$build_dir/$ENTRYPOINT.map"
+  local bin_path="$build_dir/$ENTRYPOINT.bin"
+  local size_tool
+  local flash_limit
+  local dram_limit
+  local static_dram_limit
+
+  [ -f "$elf_path" ] || die "ELF not found: $elf_path"
+  [ -f "$map_path" ] || die "MAP not found: $map_path"
+  [ -f "$bin_path" ] || die "BIN not found: $bin_path"
+
+  size_tool="$(find_size_tool "$board")"
+  flash_limit="$(board_flash_limit_bytes "$board")"
+  dram_limit="$(board_dram_limit_bytes "$board")"
+  static_dram_limit="$(board_static_dram_limit_bytes "$board")"
+  command -v python3 >/dev/null 2>&1 || die "python3 is required for elfinfo"
+
+  python3 - "$size_tool" "$build_dir" "$ENTRYPOINT" "$elf_path" "$map_path" "$bin_path" "$CLI_UNITS" "$flash_limit" "$dram_limit" "$static_dram_limit" <<'PY'
+import os
+import re
+import subprocess
+import sys
+from collections import defaultdict
+
+size_tool, build_dir, entrypoint, elf_path, map_path, bin_path, units, flash_limit, dram_limit, static_dram_limit = sys.argv[1:]
+flash_limit = int(flash_limit)
+dram_limit = int(dram_limit)
+static_dram_limit = int(static_dram_limit)
+
+def stat_size(path):
+    return os.stat(path).st_size
+
+def fmt_bytes(value):
+    if units == "b":
+        return f"{value} B"
+    if units == "kb":
+        return f"{value / 1024.0:.1f} KB"
+    if units == "mb":
+        return f"{value / (1024.0 * 1024.0):.2f} MB"
+    if value >= 1024 * 1024:
+        return f"{value / (1024.0 * 1024.0):.2f} MB"
+    if value >= 1024:
+        return f"{value / 1024.0:.1f} KB"
+    return f"{value} B"
+
+def fmt_percent(used, limit):
+    if limit <= 0:
+        return "n/a"
+    return f"{(used * 100.0) / limit:.1f}%"
+
+def fmt_usage(used, limit):
+    if limit <= 0:
+        return f"{fmt_bytes(used)} / n/a"
+    return f"{fmt_bytes(used)} / {fmt_bytes(limit)} ({fmt_percent(used, limit)})"
+
+def progress_bar(used, limit, width=24):
+    if limit <= 0:
+        return "[" + ("?" * width) + "]"
+    ratio = used / float(limit)
+    if ratio < 0:
+        ratio = 0.0
+    filled = int(width * min(ratio, 1.0) + 0.5)
+    if filled > width:
+        filled = width
+    return "[" + ("#" * filled) + ("." * (width - filled)) + "]"
+
+def parse_top_sections(map_path):
+    wanted = {"dram0.data", "dram0.bss", "flash.rodata", "flash.text", "iram0.text"}
+    out = {}
+    sec_re = re.compile(r"^\.(dram0\.data|dram0\.bss|flash\.rodata|flash\.text|iram0\.text)\s+0x[0-9a-fA-F]+\s+0x([0-9a-fA-F]+)")
+    with open(map_path, "r", errors="ignore") as fh:
+        for line in fh:
+            m = sec_re.match(line)
+            if m:
+                out[m.group(1)] = int(m.group(2), 16)
+    return out
+
+def group_of_obj(path):
+    if "/build/esp32/sketch/" in path:
+        return "sketch"
+    if "/build/esp32/libraries/SGF/SGF/" in path:
+        return "SGF"
+    if "/build/esp32/libraries/sgf-esp32/SGF/" in path:
+        return "sgf-esp32"
+    if "/build/esp32/libraries/sgf-hardware-presets/" in path:
+        return "sgf-hardware-presets"
+    if "/build/esp32/libraries/" in path:
+        return "other-libraries"
+    if "/build/esp32/core/" in path:
+        return "arduino-core"
+    return "toolchain-idf"
+
+def parse_linked_dram_by_group(map_path):
+    current = None
+    sec_re = re.compile(r"^\.(dram0\.data|dram0\.bss)\s+")
+    any_top_re = re.compile(r"^\.([A-Za-z0-9_\.]+)\s+")
+    line_re = re.compile(r"^\s+\.[^\s]*\s+0x[0-9a-fA-F]+\s+0x([0-9a-fA-F]+)\s+(.+)$")
+    agg = defaultdict(int)
+    with open(map_path, "r", errors="ignore") as fh:
+        for line in fh:
+            m = sec_re.match(line)
+            if m:
+                current = m.group(1)
+                continue
+            m = any_top_re.match(line)
+            if m and not sec_re.match(line):
+                current = None
+            if current is None:
+                continue
+            m = line_re.match(line)
+            if not m:
+                continue
+            size = int(m.group(1), 16)
+            obj = m.group(2).strip()
+            if size == 0 or obj.startswith("*fill*") or obj.startswith("0x") or obj.startswith("ALIGN"):
+                continue
+            agg[(group_of_obj(obj), current)] += size
+    return agg
+
+def parse_linked_dram_by_object(map_path):
+    current = None
+    sec_re = re.compile(r"^\.(dram0\.data|dram0\.bss)\s+")
+    any_top_re = re.compile(r"^\.([A-Za-z0-9_\.]+)\s+")
+    line_re = re.compile(r"^\s+\.[^\s]*\s+0x[0-9a-fA-F]+\s+0x([0-9a-fA-F]+)\s+(.+)$")
+    agg = defaultdict(int)
+    with open(map_path, "r", errors="ignore") as fh:
+        for line in fh:
+            m = sec_re.match(line)
+            if m:
+                current = m.group(1)
+                continue
+            m = any_top_re.match(line)
+            if m and not sec_re.match(line):
+                current = None
+            if current is None:
+                continue
+            m = line_re.match(line)
+            if not m:
+                continue
+            size = int(m.group(1), 16)
+            obj = m.group(2).strip()
+            if size == 0 or obj.startswith("*fill*") or obj.startswith("0x") or obj.startswith("ALIGN"):
+                continue
+            agg[obj] += size
+    return agg
+
+def collect_object_sizes(size_tool, root):
+    groups = {
+        "sketch": os.path.join(root, "sketch"),
+        "SGF": os.path.join(root, "libraries", "SGF", "SGF"),
+        "sgf-esp32": os.path.join(root, "libraries", "sgf-esp32", "SGF"),
+        "sgf-hardware-presets": os.path.join(root, "libraries", "sgf-hardware-presets"),
+    }
+    out = {}
+    for name, base in groups.items():
+        files = []
+        if not os.path.isdir(base):
+            continue
+        for dirpath, _, filenames in os.walk(base):
+            for fn in filenames:
+                if fn.endswith(".o"):
+                    files.append(os.path.join(dirpath, fn))
+        files.sort()
+        if not files:
+            continue
+        proc = subprocess.check_output([size_tool, *files], text=True)
+        totals = [0, 0, 0, 0]
+        for line in proc.splitlines()[1:]:
+            parts = line.split()
+            if len(parts) >= 5 and parts[0].isdigit():
+                vals = list(map(int, parts[:4]))
+                for i, v in enumerate(vals):
+                    totals[i] += v
+        out[name] = totals
+    return out
+
+sections = parse_top_sections(map_path)
+linked_dram = parse_linked_dram_by_group(map_path)
+linked_dram_objects = parse_linked_dram_by_object(map_path)
+object_sizes = collect_object_sizes(size_tool, build_dir)
+flash_used = sections.get("flash.text", 0) + sections.get("flash.rodata", 0)
+dram_used = sections.get("dram0.data", 0) + sections.get("dram0.bss", 0)
+static_dram_used = dram_used
+
+print("[ELFINFO] files")
+print(f"  elf: {elf_path} ({fmt_bytes(stat_size(elf_path))})")
+print(f"  bin: {bin_path} ({fmt_bytes(stat_size(bin_path))})")
+print(f"  map: {map_path} ({fmt_bytes(stat_size(map_path))})")
+
+print("[ELFINFO] sections")
+for key in ("flash.text", "flash.rodata", "iram0.text", "dram0.data", "dram0.bss"):
+    value = sections.get(key, 0)
+    print(f"  {key}: {fmt_bytes(value)}")
+
+print("[ELFINFO] linked dram by group")
+print("  exact static DRAM contribution after link")
+groups = ("sketch", "SGF", "sgf-esp32", "sgf-hardware-presets", "other-libraries", "arduino-core", "toolchain-idf")
+for group in groups:
+    data = linked_dram.get((group, "dram0.data"), 0)
+    bss = linked_dram.get((group, "dram0.bss"), 0)
+    total = data + bss
+    if total == 0:
+        continue
+    print(f"  {group}: init-data={fmt_bytes(data)} zero-bss={fmt_bytes(bss)} static-total={fmt_bytes(total)}")
+
+print("[ELFINFO] compiled object sizes (approx)")
+print("  compile-time object sums; useful for code-size direction, not exact post-link usage")
+for group in ("sketch", "SGF", "sgf-esp32", "sgf-hardware-presets"):
+    vals = object_sizes.get(group)
+    if not vals:
+        continue
+    text, data, bss, dec = vals
+    print(f"  {group}: code={fmt_bytes(text)} init-data={fmt_bytes(data)} zero-bss={fmt_bytes(bss)} object-total={fmt_bytes(dec)}")
+
+print("[ELFINFO] board limits")
+if flash_limit > 0:
+    print(f"  flash usage: {fmt_usage(flash_used, flash_limit)}")
+if dram_limit > 0:
+    print(f"  dram usage: {fmt_usage(dram_used, dram_limit)}")
+if static_dram_limit > 0:
+    print(f"  static dram link segment: {fmt_usage(static_dram_used, static_dram_limit)}")
+
+print("[ELFINFO] usage bars")
+if flash_limit > 0:
+    print(f"  flash {progress_bar(flash_used, flash_limit)} {fmt_percent(flash_used, flash_limit)}")
+if dram_limit > 0:
+    print(f"  dram  {progress_bar(dram_used, dram_limit)} {fmt_percent(dram_used, dram_limit)}")
+if static_dram_limit > 0:
+    print(f"  sdram {progress_bar(static_dram_used, static_dram_limit)} {fmt_percent(static_dram_used, static_dram_limit)}")
+
+print("[ELFINFO] top static DRAM objects")
+top_objects = sorted(linked_dram_objects.items(), key=lambda kv: kv[1], reverse=True)[:12]
+for obj, size in top_objects:
+    label = obj
+    if "/build/esp32/sketch/" in obj:
+        label = "sketch/" + os.path.basename(obj)
+    elif "/build/esp32/libraries/SGF/SGF/" in obj:
+        label = "SGF/" + os.path.basename(obj)
+    elif "/build/esp32/libraries/sgf-esp32/SGF/" in obj:
+        label = "sgf-esp32/" + os.path.basename(obj)
+    elif "/build/esp32/core/" in obj:
+        label = "core/" + os.path.basename(obj)
+    else:
+        label = os.path.basename(obj)
+    print(f"  {label}: {fmt_bytes(size)}")
+PY
+}
+
 run_upload() {
   local board="$1"
   local fqbn="$2"
@@ -826,10 +1208,16 @@ run_upload() {
   local port="$4"
   local build_dir="$PWD/build/$board"
   local stage_dir="$PWD/build-stage/$board/$SKETCH_NAME"
+  local build_elf="$build_dir/$ENTRYPOINT.elf"
+  local build_bin="$build_dir/$ENTRYPOINT.bin"
   local arduino_cli
   local upload_args=()
 
   [ -n "$port" ] || die "port is required for upload/flash"
+  [ -d "$build_dir" ] || die "build directory not found: $build_dir (run '$SCRIPT_NAME build board=$board' or use '$SCRIPT_NAME flash')"
+  [ -d "$stage_dir" ] || die "staged sketch not found: $stage_dir (run '$SCRIPT_NAME build board=$board' or use '$SCRIPT_NAME flash')"
+  [ -f "$build_elf" ] || die "ELF not found: $build_elf (run '$SCRIPT_NAME build board=$board' or use '$SCRIPT_NAME flash')"
+  [ -f "$build_bin" ] || die "BIN not found: $build_bin (run '$SCRIPT_NAME build board=$board' or use '$SCRIPT_NAME flash')"
 
   arduino_cli="$(find_arduino_cli)"
 
@@ -853,6 +1241,19 @@ run_upload() {
   fi
 
   upload_args+=("$stage_dir")
+  if [ "$CLI_QUIET" -eq 1 ] && [ "$CLI_VERBOSE" -eq 0 ]; then
+    local output
+    local status
+    set +e
+    output="$("$arduino_cli" "${upload_args[@]}" 2>&1)"
+    status=$?
+    set -e
+    if [ "$status" -ne 0 ]; then
+      printf '%s\n' "$output"
+    fi
+    return "$status"
+  fi
+
   "$arduino_cli" "${upload_args[@]}"
 }
 
@@ -917,7 +1318,21 @@ command_build_like() {
     build)
       run_compile "$board" "$fqbn" "$board_options" "$build_extra_flags" "$CLI_CLEAN_BUILD"
       ;;
-    upload|flash)
+    elfinfo|bininfo)
+      if [ "$CLI_BUILD" -eq 1 ]; then
+        run_compile "$board" "$fqbn" "$board_options" "$build_extra_flags" "$CLI_CLEAN_BUILD"
+      elif [ "$CLI_CLEAN_BUILD" -eq 1 ]; then
+        die "--clean-build requires --build for elfinfo"
+      fi
+      run_elfinfo "$board"
+      ;;
+    upload)
+      if [ "$CLI_CLEAN_BUILD" -eq 1 ]; then
+        die "--clean-build is not valid for upload; use 'flash' for build+upload"
+      fi
+      run_upload "$board" "$fqbn" "$board_options" "$port"
+      ;;
+    flash)
       run_compile "$board" "$fqbn" "$board_options" "$build_extra_flags" "$CLI_CLEAN_BUILD"
       run_upload "$board" "$fqbn" "$board_options" "$port"
       ;;
@@ -1104,7 +1519,7 @@ main() {
       shift
       init_project "$@"
       ;;
-    build|flash|upload|monitor|boards|info|clean)
+    build|elfinfo|bininfo|flash|upload|monitor|boards|info|clean)
       shift
       parse_runtime_args "$@"
       command_build_like "$cmd"

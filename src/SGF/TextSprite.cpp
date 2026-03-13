@@ -1,6 +1,94 @@
 #include "TextSprite.h"
 
+#include <stdlib.h>
+
 #include "FontRenderer.h"
+
+namespace {
+uint16_t kEmptyTextSpritePixel = TextSprite::TRANSPARENT;
+}
+
+TextSprite::TextSprite() = default;
+
+TextSprite::TextSprite(const TextSprite& other) { copyFrom(other); }
+
+TextSprite::TextSprite(TextSprite&& other) noexcept { moveFrom(static_cast<TextSprite&&>(other)); }
+
+TextSprite::~TextSprite() {
+    releaseBitmapStorage();
+}
+
+TextSprite& TextSprite::operator=(const TextSprite& other) {
+    if (this != &other) {
+        releaseBitmapStorage();
+        copyFrom(other);
+    }
+    return *this;
+}
+
+TextSprite& TextSprite::operator=(TextSprite&& other) noexcept {
+    if (this != &other) {
+        releaseBitmapStorage();
+        moveFrom(static_cast<TextSprite&&>(other));
+    }
+    return *this;
+}
+
+void TextSprite::releaseBitmapStorage() {
+#if SGF_TEXTSPRITE_HEAP_BITMAP
+    free(pixels565);
+    pixels565 = nullptr;
+#endif
+}
+
+uint16_t* TextSprite::bitmapPixels() { return pixels565; }
+
+const uint16_t* TextSprite::bitmapPixels() const { return pixels565; }
+
+bool TextSprite::ensureBitmapStorage() {
+#if SGF_TEXTSPRITE_HEAP_BITMAP
+    if (pixels565 == nullptr) {
+        pixels565 = static_cast<uint16_t*>(malloc(sizeof(uint16_t) * MAX_BITMAP_W * MAX_BITMAP_H));
+    }
+#endif
+    return pixels565 != nullptr;
+}
+
+void TextSprite::copyFrom(const TextSprite& other) {
+    boundSprite = other.boundSprite;
+    alignX = other.alignX;
+    scale = other.scale;
+    bitmapW = other.bitmapW;
+    bitmapH = other.bitmapH;
+    color565 = other.color565;
+    memcpy(text_, other.text_, sizeof(text_));
+#if SGF_TEXTSPRITE_HEAP_BITMAP
+    pixels565 = nullptr;
+    if (other.pixels565 != nullptr && ensureBitmapStorage()) {
+        memcpy(pixels565, other.pixels565, sizeof(uint16_t) * MAX_BITMAP_W * MAX_BITMAP_H);
+    }
+#else
+    memcpy(pixels565Storage, other.pixels565Storage, sizeof(pixels565Storage));
+    pixels565 = pixels565Storage;
+#endif
+}
+
+void TextSprite::moveFrom(TextSprite&& other) {
+    boundSprite = other.boundSprite;
+    alignX = other.alignX;
+    scale = other.scale;
+    bitmapW = other.bitmapW;
+    bitmapH = other.bitmapH;
+    color565 = other.color565;
+    memcpy(text_, other.text_, sizeof(text_));
+#if SGF_TEXTSPRITE_HEAP_BITMAP
+    pixels565 = other.pixels565;
+    other.pixels565 = nullptr;
+#else
+    memcpy(pixels565Storage, other.pixels565Storage, sizeof(pixels565Storage));
+    pixels565 = pixels565Storage;
+#endif
+}
 
 void TextSprite::bindSprite(Renderer2D::SpriteHandle sprite) {
     boundSprite = sprite;
@@ -51,7 +139,8 @@ int TextSprite::width() const { return bitmapW; }
 int TextSprite::height() const { return bitmapH; }
 
 void TextSprite::fillRect565(int x, int y, int w, int h, uint16_t color565) {
-    if (w <= 0 || h <= 0 || bitmapW <= 0 || bitmapH <= 0) {
+    uint16_t* pixels = bitmapPixels();
+    if (pixels == nullptr || w <= 0 || h <= 0 || bitmapW <= 0 || bitmapH <= 0) {
         return;
     }
 
@@ -66,7 +155,7 @@ void TextSprite::fillRect565(int x, int y, int w, int h, uint16_t color565) {
     }
 
     for (int yy = clipY0; yy < clipY1; ++yy) {
-        uint16_t* row = pixels565 + yy * bitmapW;
+        uint16_t* row = pixels + yy * bitmapW;
         for (int xx = clipX0; xx < clipX1; ++xx) {
             row[xx] = color565;
         }
@@ -83,9 +172,17 @@ void TextSprite::rebuildBitmap() {
         bitmapH = MAX_BITMAP_H;
     }
 
+    if (bitmapW > 0 && bitmapH > 0 && !ensureBitmapStorage()) {
+        bitmapW = 0;
+        bitmapH = 0;
+        syncBoundSprite();
+        return;
+    }
+
+    uint16_t* pixels = bitmapPixels();
     const int totalPixels = bitmapW * bitmapH;
     for (int i = 0; i < totalPixels; ++i) {
-        pixels565[i] = TRANSPARENT;
+        pixels[i] = TRANSPARENT;
     }
 
     if (bitmapW > 0 && bitmapH > 0) {
@@ -114,8 +211,11 @@ void TextSprite::syncBoundSprite() {
     }
 
     boundSprite.setAnchor(Vector2f{anchorX, 0.0f});
-    boundSprite.setBitmap(pixels565, bitmapW > 0 ? bitmapW : 1, bitmapH > 0 ? bitmapH : 1,
-                          TRANSPARENT);
+    const uint16_t* pixels = bitmapPixels();
+    if (pixels == nullptr) {
+        pixels = &kEmptyTextSpritePixel;
+    }
+    boundSprite.setBitmap(pixels, bitmapW > 0 ? bitmapW : 1, bitmapH > 0 ? bitmapH : 1, TRANSPARENT);
     boundSprite.setPosition(getPosition());
     boundSprite.setActive(bitmapW > 0 && bitmapH > 0);
 }
