@@ -12,11 +12,8 @@ enum class Waveform : uint8_t {
   Noise,
 };
 
-enum FilterFlags : uint8_t {
-  FilterNone = 0,
-  FilterLowPass = 1 << 0,
-  FilterHighPass = 1 << 1,
-};
+#define AUDIO_FILTER_LP (1u << 0)
+#define AUDIO_FILTER_HP (1u << 1)
 
 enum class NoteProgramKind : uint8_t {
   Synth = 0,
@@ -58,7 +55,7 @@ struct Instrument {
   Lfo pitchLfo{};
   const PitchPoint* pitchEnv = nullptr;
   uint8_t pitchEnvCount = 0;
-  uint8_t filterFlags = FilterNone;
+  uint8_t filterFlags = 0u;
   float lowPassCutoffHz = 0.0f;
   float highPassCutoffHz = 0.0f;
   uint8_t volume = 255;

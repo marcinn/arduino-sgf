@@ -236,12 +236,14 @@ float SynthEngine::applyFilters(Voice& voice, float sample) {
     return sample;
   }
   float filtered = sample;
-  if ((voice.instrument->filterFlags & FilterLowPass) != 0u && voice.instrument->lowPassCutoffHz > 0.0f) {
+  if ((voice.instrument->filterFlags & AUDIO_FILTER_LP) != 0u &&
+      voice.instrument->lowPassCutoffHz > 0.0f) {
     const float alpha = voice.filter.lowPassAlpha;
     voice.filter.lowPassState = (1.0f - alpha) * filtered + alpha * voice.filter.lowPassState;
     filtered = voice.filter.lowPassState;
   }
-  if ((voice.instrument->filterFlags & FilterHighPass) != 0u && voice.instrument->highPassCutoffHz > 0.0f) {
+  if ((voice.instrument->filterFlags & AUDIO_FILTER_HP) != 0u &&
+      voice.instrument->highPassCutoffHz > 0.0f) {
     const float alpha = voice.filter.highPassAlpha;
     voice.filter.highPassLowState =
       (1.0f - alpha) * filtered + alpha * voice.filter.highPassLowState;
