@@ -3,65 +3,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "AudioTypes.h"
 #include "IAudioSource.h"
+#include "INotePlayer.h"
 
 namespace SGFAudio {
-
-enum class Waveform : uint8_t {
-  Sine = 0,
-  Triangle,
-  Square,
-  Saw,
-  Noise,
-};
-
-enum FilterFlags : uint8_t {
-  FilterNone = 0,
-  FilterLowPass = 1 << 0,
-  FilterHighPass = 1 << 1,
-};
-
-struct Adsr {
-  uint16_t attackMs = 0;
-  uint16_t decayMs = 0;
-  uint8_t sustain = 255;
-  uint16_t releaseMs = 0;
-};
-
-struct Lfo {
-  bool enabled = false;
-  Waveform waveform = Waveform::Sine;
-  float rateHz = 0.0f;
-  float depthCents = 0.0f;
-};
-
-struct PitchPoint {
-  uint16_t timeMs = 0;
-  int16_t cents = 0;
-};
-
-struct AudioSample {
-  const int8_t* pcm = nullptr;
-  uint32_t length = 0;
-  uint32_t sampleRate = 0;
-  float rootHz = 440.0f;
-  bool loop = false;
-  uint32_t loopStart = 0;
-  uint32_t loopEnd = 0;
-};
-
-struct Instrument {
-  Waveform waveform = Waveform::Square;
-  const AudioSample* sample = nullptr;
-  Adsr ampEnv{};
-  Lfo pitchLfo{};
-  const PitchPoint* pitchEnv = nullptr;
-  uint8_t pitchEnvCount = 0;
-  uint8_t filterFlags = FilterNone;
-  float lowPassCutoffHz = 0.0f;
-  float highPassCutoffHz = 0.0f;
-  uint8_t volume = 255;
-};
 
 struct SfxStep {
   uint16_t durationMs = 0;
@@ -78,7 +24,7 @@ struct Sfx {
   uint8_t stepCount = 0;
 };
 
-class SynthEngine : public IAudioSource {
+class SynthEngine : public IAudioSource, public INotePlayer {
 public:
   static constexpr int MAX_VOICES = 8;
 
@@ -92,13 +38,14 @@ public:
 
   void reset();
 
+  void noteOn(int voiceIndex, NoteProgramRef program, float baseHz, uint8_t velocity = 255) override;
   void noteOn(int voiceIndex, const Instrument& instrument, float baseHz, uint8_t velocity = 255);
-  void noteOff(int voiceIndex);
+  void noteOff(int voiceIndex) override;
 
   void triggerSfx(int voiceIndex, const Sfx& sfx, float baseHz, uint8_t velocity = 255);
   int playSfx(const Sfx& sfx, float baseHz, uint8_t velocity = 255);
 
-  bool voiceActive(int voiceIndex) const;
+  bool voiceActive(int voiceIndex) const override;
 
   int16_t renderSample() override;
   void renderMono(int16_t* samples, size_t sampleCount);
@@ -149,7 +96,6 @@ private:
 
   static float waveformSample(Waveform waveform, float phase);
   static float noiseSample(Voice& voice);
-  float samplePlayback(Voice& voice, float pitchRatio) const;
   static float clampUnit(float value);
   static float semitoneRatio(float semitones);
   static uint32_t msToSamples(uint32_t sampleRate, uint16_t ms);

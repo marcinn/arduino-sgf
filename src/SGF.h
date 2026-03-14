@@ -1,5 +1,7 @@
 #pragma once
 #include "SGF/ActionState.h"
+#include "SGF/AudioMixer.h"
+#include "SGF/AudioTypes.h"
 #include "SGF/ActionBinding.h"
 #include "SGF/AreaCollider.h"
 #include "SGF/BitTileCollider.h"
@@ -33,6 +35,7 @@
 #include "SGF/IRenderTarget.h"
 #include "SGF/IRenderer.h"
 #include "SGF/IInput.h"
+#include "SGF/INotePlayer.h"
 #include "SGF/IScreen.h"
 #include "SGF/InputPin.h"
 #include "SGF/Math.h"
@@ -45,6 +48,7 @@
 #include "SGF/Scene.h"
 #include "SGF/Scroller.h"
 #include "SGF/SerialMonitor.h"
+#include "SGF/SamplePlayer.h"
 #include "SGF/Song.h"
 #include "SGF/Sprite.h"
 #include "SGF/SpriteCharacter.h"

@@ -2,7 +2,8 @@
 
 #include <stdint.h>
 
-#include "Synth.h"
+#include "AudioTypes.h"
+#include "INotePlayer.h"
 
 namespace SGFAudio {
 
@@ -22,9 +23,9 @@ struct Pattern {
 class PatternTrack {
 public:
   PatternTrack() = default;
-  PatternTrack(SynthEngine& synth, int voiceIndex, const Instrument& instrument, const Pattern& pattern);
+  PatternTrack(INotePlayer& player, int voiceIndex, NoteProgramRef program, const Pattern& pattern);
 
-  void bind(SynthEngine& synth, int voiceIndex, const Instrument& instrument, const Pattern& pattern);
+  void bind(INotePlayer& player, int voiceIndex, NoteProgramRef program, const Pattern& pattern);
   void bindPattern(const Pattern& pattern, bool preserveTiming = true);
   void reset();
   void tick();
@@ -34,8 +35,8 @@ private:
   void resetSequence(bool preserveRemainder);
   void advance();
 
-  SynthEngine* synthEngine = nullptr;
-  const Instrument* instrumentRef = nullptr;
+  INotePlayer* notePlayer = nullptr;
+  NoteProgramRef programRef{};
   const Pattern* patternRef = nullptr;
   int voice = -1;
   uint32_t samplesRemaining = 0u;

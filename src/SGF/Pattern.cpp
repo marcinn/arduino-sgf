@@ -19,14 +19,14 @@ uint32_t unitsToSamples(uint32_t sampleRate, uint16_t unitMs, uint16_t length, u
 }  // namespace
 
 PatternTrack::PatternTrack(
-  SynthEngine& synth, int voiceIndex, const Instrument& instrument, const Pattern& pattern) {
-  bind(synth, voiceIndex, instrument, pattern);
+  INotePlayer& player, int voiceIndex, NoteProgramRef program, const Pattern& pattern) {
+  bind(player, voiceIndex, program, pattern);
 }
 
 void PatternTrack::bind(
-  SynthEngine& synth, int voiceIndex, const Instrument& instrument, const Pattern& pattern) {
-  synthEngine = &synth;
-  instrumentRef = &instrument;
+  INotePlayer& player, int voiceIndex, NoteProgramRef program, const Pattern& pattern) {
+  notePlayer = &player;
+  programRef = program;
   patternRef = &pattern;
   voice = voiceIndex;
   reset();
@@ -39,8 +39,8 @@ void PatternTrack::bindPattern(const Pattern& pattern, bool preserveTiming) {
 
 void PatternTrack::reset() {
   resetSequence(false);
-  if (synthEngine != nullptr && voice >= 0) {
-    synthEngine->noteOff(voice);
+  if (notePlayer != nullptr && voice >= 0) {
+    notePlayer->noteOff(voice);
   }
 }
 
@@ -54,7 +54,7 @@ void PatternTrack::resetSequence(bool preserveRemainder) {
 }
 
 void PatternTrack::tick() {
-  if (synthEngine == nullptr || instrumentRef == nullptr || patternRef == nullptr ||
+  if (notePlayer == nullptr || programRef.ptr == nullptr || patternRef == nullptr ||
       patternRef->steps == nullptr || patternRef->stepCount == 0u || voice < 0) {
     return;
   }
@@ -70,14 +70,14 @@ void PatternTrack::tick() {
 }
 
 void PatternTrack::advance() {
-  if (synthEngine == nullptr || instrumentRef == nullptr || patternRef == nullptr ||
+  if (notePlayer == nullptr || programRef.ptr == nullptr || patternRef == nullptr ||
       patternRef->steps == nullptr || patternRef->stepCount == 0u || voice < 0) {
     return;
   }
 
   if (stepIndex >= patternRef->stepCount) {
     if (!patternRef->loop) {
-      synthEngine->noteOff(voice);
+      notePlayer->noteOff(voice);
       samplesRemaining = 0u;
       completed = true;
       return;
@@ -87,13 +87,13 @@ void PatternTrack::advance() {
 
   const PatternStep& step = patternRef->steps[stepIndex];
   if (step.hz > 0.0f && step.velocity > 0u) {
-    synthEngine->noteOn(voice, *instrumentRef, step.hz, step.velocity);
+    notePlayer->noteOn(voice, programRef, step.hz, step.velocity);
   } else {
-    synthEngine->noteOff(voice);
+    notePlayer->noteOff(voice);
   }
 
   samplesRemaining = unitsToSamples(
-    synthEngine->sampleRate(), patternRef->unitMs, step.length, sampleRemainder);
+    notePlayer->sampleRate(), patternRef->unitMs, step.length, sampleRemainder);
   ++stepIndex;
 }
 

@@ -152,16 +152,10 @@ float SynthEngine::nextVoiceSample(Voice& voice) {
   const float pitchCents = static_cast<float>(voice.semitoneOffset * 100) +
                            static_cast<float>(voice.centsOffset) +
                            pitchEnvCents(voice) + lfoCents(voice);
-  const float pitchRatio = semitoneRatio(pitchCents / 100.0f);
-  voice.currentHz = voice.baseHz * pitchRatio;
+  voice.currentHz = voice.baseHz * semitoneRatio(pitchCents / 100.0f);
   const float phaseStep = voice.currentHz / static_cast<float>(sampleRateHz);
   float raw = 0.0f;
-  if (voice.instrument->sample != nullptr) {
-    raw = samplePlayback(voice, pitchRatio);
-    if (!voice.active) {
-      return 0.0f;
-    }
-  } else if (voice.instrument->waveform == Waveform::Noise) {
+  if (voice.instrument->waveform == Waveform::Noise) {
     raw = noiseSample(voice);
   } else {
     raw = waveformSample(voice.instrument->waveform, voice.phase);
@@ -254,35 +248,6 @@ float SynthEngine::applyFilters(Voice& voice, float sample) {
     filtered -= voice.filter.highPassLowState;
   }
   return filtered;
-}
-
-float SynthEngine::samplePlayback(Voice& voice, float pitchRatio) const {
-  const AudioSample* sample = voice.instrument->sample;
-  if (sample == nullptr || sample->pcm == nullptr || sample->length == 0u || sample->sampleRate == 0u) {
-    voice.active = false;
-    voice.envStage = EnvStage::Idle;
-    return 0.0f;
-  }
-
-  uint32_t sampleIndex = static_cast<uint32_t>(voice.samplePos);
-  if (sampleIndex >= sample->length) {
-    if (sample->loop && sample->loopEnd > sample->loopStart && sample->loopEnd <= sample->length) {
-      const uint32_t loopLen = sample->loopEnd - sample->loopStart;
-      sampleIndex = sample->loopStart + ((sampleIndex - sample->loopStart) % loopLen);
-      voice.samplePos = static_cast<float>(sampleIndex);
-    } else {
-      voice.active = false;
-      voice.envStage = EnvStage::Idle;
-      return 0.0f;
-    }
-  }
-
-  const float raw = static_cast<float>(sample->pcm[sampleIndex]) / 128.0f;
-  const float rootHz = (sample->rootHz > 0.0f) ? sample->rootHz : 440.0f;
-  const float step = (static_cast<float>(sample->sampleRate) / static_cast<float>(sampleRateHz)) *
-                     (voice.baseHz / rootHz) * pitchRatio;
-  voice.samplePos += (step > 0.0f) ? step : 0.0f;
-  return raw;
 }
 
 }  // namespace SGFAudio

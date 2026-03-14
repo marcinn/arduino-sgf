@@ -8,7 +8,8 @@ namespace SGFAudio {
 
 struct SongLane {
   int voiceIndex = -1;
-  const Instrument* instrument = nullptr;
+  INotePlayer* player = nullptr;
+  NoteProgramRef program{};
   const struct SongClip* clips = nullptr;
   uint16_t clipCount = 0;
 };
@@ -26,9 +27,9 @@ struct Song {
 class SongPlayer {
 public:
   SongPlayer() = default;
-  SongPlayer(SynthEngine& synth, const Song& song);
+  explicit SongPlayer(const Song& song);
 
-  void bind(SynthEngine& synth, const Song& song);
+  void bind(const Song& song);
   void reset();
   void tick();
 
@@ -43,9 +44,9 @@ private:
 
   void advanceLane(LaneState& state);
 
-  SynthEngine* synthEngine = nullptr;
   const Song* songRef = nullptr;
-  LaneState laneStates[SynthEngine::MAX_VOICES]{};
+  static constexpr uint8_t MAX_LANES = 8;
+  LaneState laneStates[MAX_LANES]{};
   uint8_t trackCount = 0u;
 };
 

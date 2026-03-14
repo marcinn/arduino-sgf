@@ -25,6 +25,13 @@ void SynthEngine::reset() {
   memset(voices, 0, sizeof(voices));
 }
 
+void SynthEngine::noteOn(int voiceIndex, NoteProgramRef program, float baseHz, uint8_t velocity) {
+  if (program.kind != NoteProgramKind::Synth || program.ptr == nullptr) {
+    return;
+  }
+  noteOn(voiceIndex, *static_cast<const Instrument*>(program.ptr), baseHz, velocity);
+}
+
 void SynthEngine::noteOn(int voiceIndex, const Instrument& instrument, float baseHz, uint8_t velocity) {
   if (voiceIndex < 0 || voiceIndex >= MAX_VOICES) {
     return;
