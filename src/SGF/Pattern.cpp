@@ -4,12 +4,15 @@ namespace SGFAudio {
 
 namespace {
 
-uint32_t unitsToSamples(uint32_t sampleRate, uint16_t unitMs, uint16_t length) {
+uint32_t unitsToSamples(uint32_t sampleRate, uint16_t unitMs, uint16_t length, uint16_t& remainderMs) {
   if (sampleRate == 0u || unitMs == 0u || length == 0u) {
     return 1u;
   }
   const uint32_t durationMs = static_cast<uint32_t>(unitMs) * static_cast<uint32_t>(length);
-  const uint32_t samples = static_cast<uint32_t>((static_cast<uint64_t>(sampleRate) * durationMs) / 1000u);
+  const uint64_t numerator =
+    static_cast<uint64_t>(sampleRate) * static_cast<uint64_t>(durationMs) + remainderMs;
+  const uint32_t samples = static_cast<uint32_t>(numerator / 1000u);
+  remainderMs = static_cast<uint16_t>(numerator % 1000u);
   return samples == 0u ? 1u : samples;
 }
 
@@ -29,17 +32,24 @@ void PatternTrack::bind(
   reset();
 }
 
-void PatternTrack::bindPattern(const Pattern& pattern) {
+void PatternTrack::bindPattern(const Pattern& pattern, bool preserveTiming) {
   patternRef = &pattern;
-  reset();
+  resetSequence(preserveTiming);
 }
 
 void PatternTrack::reset() {
+  resetSequence(false);
+  if (synthEngine != nullptr && voice >= 0) {
+    synthEngine->noteOff(voice);
+  }
+}
+
+void PatternTrack::resetSequence(bool preserveRemainder) {
   samplesRemaining = 0u;
   stepIndex = 0u;
   completed = false;
-  if (synthEngine != nullptr && voice >= 0) {
-    synthEngine->noteOff(voice);
+  if (!preserveRemainder) {
+    sampleRemainder = 0u;
   }
 }
 
@@ -82,7 +92,8 @@ void PatternTrack::advance() {
     synthEngine->noteOff(voice);
   }
 
-  samplesRemaining = unitsToSamples(synthEngine->sampleRate(), patternRef->unitMs, step.length);
+  samplesRemaining = unitsToSamples(
+    synthEngine->sampleRate(), patternRef->unitMs, step.length, sampleRemainder);
   ++stepIndex;
 }
 

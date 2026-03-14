@@ -40,8 +40,19 @@ struct PitchPoint {
   int16_t cents = 0;
 };
 
+struct AudioSample {
+  const int8_t* pcm = nullptr;
+  uint32_t length = 0;
+  uint32_t sampleRate = 0;
+  float rootHz = 440.0f;
+  bool loop = false;
+  uint32_t loopStart = 0;
+  uint32_t loopEnd = 0;
+};
+
 struct Instrument {
   Waveform waveform = Waveform::Square;
+  const AudioSample* sample = nullptr;
   Adsr ampEnv{};
   Lfo pitchLfo{};
   const PitchPoint* pitchEnv = nullptr;
@@ -122,6 +133,7 @@ private:
     int16_t centsOffset = 0;
     uint8_t stepVolume = 255;
     uint32_t noiseState = 0x12345678u;
+    float samplePos = 0.0f;
     EnvStage envStage = EnvStage::Idle;
     uint32_t ageSamples = 0;
     uint32_t stepElapsedSamples = 0;
@@ -137,6 +149,7 @@ private:
 
   static float waveformSample(Waveform waveform, float phase);
   static float noiseSample(Voice& voice);
+  float samplePlayback(Voice& voice, float pitchRatio) const;
   static float clampUnit(float value);
   static float semitoneRatio(float semitones);
   static uint32_t msToSamples(uint32_t sampleRate, uint16_t ms);

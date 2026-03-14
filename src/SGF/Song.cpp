@@ -43,7 +43,8 @@ void SongPlayer::reset() {
     state.repeatIndex = 0u;
     state.active = (state.lane != nullptr);
     if (state.lane != nullptr && state.lane->clipCount > 0u && state.lane->clips[0].pattern != nullptr) {
-      state.track.bindPattern(*state.lane->clips[0].pattern);
+      state.track.reset();
+      state.track.bindPattern(*state.lane->clips[0].pattern, false);
     } else {
       state.track.reset();
       state.active = false;
@@ -63,6 +64,9 @@ void SongPlayer::tick() {
     state.track.tick();
     if (state.track.finished()) {
       advanceLane(state);
+      if (state.active) {
+        state.track.tick();
+      }
     }
   }
 }
@@ -86,7 +90,7 @@ void SongPlayer::advanceLane(LaneState& state) {
     state.active = false;
     return;
   }
-  state.track.bindPattern(*nextClip.pattern);
+  state.track.bindPattern(*nextClip.pattern, true);
 }
 
 }  // namespace SGFAudio
