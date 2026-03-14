@@ -142,9 +142,16 @@ float SynthEngine::waveformSample(Waveform waveform, float phase) {
       return (phase < 0.5f) ? 1.0f : -1.0f;
     case Waveform::Saw:
       return (2.0f * phase) - 1.0f;
+    case Waveform::Noise:
     default:
       return 0.0f;
   }
+}
+
+float SynthEngine::noiseSample(Voice& voice) {
+  voice.noiseState = voice.noiseState * 1664525u + 1013904223u;
+  const uint32_t bits = (voice.noiseState >> 8) & 0xFFFFu;
+  return (static_cast<float>(bits) / 32767.5f) - 1.0f;
 }
 
 float SynthEngine::clampUnit(float value) {
@@ -184,6 +191,7 @@ void SynthEngine::startVoice(Voice& voice, const Instrument& instrument, float b
   voice.stepElapsedSamples = 0u;
   voice.stepDurationSamples = 0u;
   voice.ageSamples = 0u;
+  voice.noiseState = 0xA341316Cu ^ static_cast<uint32_t>(lrintf(voice.baseHz * 100.0f));
   voice.filter.lowPassState = 0.0f;
   voice.filter.highPassLowState = 0.0f;
   updateFilterCoefficients(voice);
@@ -302,10 +310,14 @@ float SynthEngine::nextVoiceSample(Voice& voice) {
                            pitchEnvCents(voice) + lfoCents(voice);
   voice.currentHz = voice.baseHz * semitoneRatio(pitchCents / 100.0f);
   const float phaseStep = voice.currentHz / static_cast<float>(sampleRateHz);
-  const float raw = waveformSample(voice.instrument->waveform, voice.phase);
-  voice.phase += phaseStep;
-  if (voice.phase >= 1.0f) {
-    voice.phase -= floorf(voice.phase);
+  const float raw = (voice.instrument->waveform == Waveform::Noise)
+                      ? noiseSample(voice)
+                      : waveformSample(voice.instrument->waveform, voice.phase);
+  if (voice.instrument->waveform != Waveform::Noise) {
+    voice.phase += phaseStep;
+    if (voice.phase >= 1.0f) {
+      voice.phase -= floorf(voice.phase);
+    }
   }
 
   const float velocityGain = static_cast<float>(voice.velocity) / 255.0f;

@@ -12,6 +12,7 @@ enum class Waveform : uint8_t {
   Triangle,
   Square,
   Saw,
+  Noise,
 };
 
 enum FilterFlags : uint8_t {
@@ -68,7 +69,7 @@ struct Sfx {
 
 class SynthEngine : public IAudioSource {
 public:
-  static constexpr int MAX_VOICES = 4;
+  static constexpr int MAX_VOICES = 8;
 
   explicit SynthEngine(uint32_t sampleRate = 22050u);
 
@@ -120,6 +121,7 @@ private:
     int8_t semitoneOffset = 0;
     int16_t centsOffset = 0;
     uint8_t stepVolume = 255;
+    uint32_t noiseState = 0x12345678u;
     EnvStage envStage = EnvStage::Idle;
     uint32_t ageSamples = 0;
     uint32_t stepElapsedSamples = 0;
@@ -134,6 +136,7 @@ private:
   Voice voices[MAX_VOICES]{};
 
   static float waveformSample(Waveform waveform, float phase);
+  static float noiseSample(Voice& voice);
   static float clampUnit(float value);
   static float semitoneRatio(float semitones);
   static uint32_t msToSamples(uint32_t sampleRate, uint16_t ms);
