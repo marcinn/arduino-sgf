@@ -9,7 +9,13 @@ namespace SGFAudio {
 struct SongLane {
   int voiceIndex = -1;
   const Instrument* instrument = nullptr;
+  const struct SongClip* clips = nullptr;
+  uint16_t clipCount = 0;
+};
+
+struct SongClip {
   const Pattern* pattern = nullptr;
+  uint16_t repeats = 1;
 };
 
 struct Song {
@@ -27,9 +33,19 @@ public:
   void tick();
 
 private:
+  struct LaneState {
+    PatternTrack track{};
+    const SongLane* lane = nullptr;
+    uint16_t clipIndex = 0u;
+    uint16_t repeatIndex = 0u;
+    bool active = false;
+  };
+
+  void advanceLane(LaneState& state);
+
   SynthEngine* synthEngine = nullptr;
   const Song* songRef = nullptr;
-  PatternTrack tracks[SynthEngine::MAX_VOICES]{};
+  LaneState laneStates[SynthEngine::MAX_VOICES]{};
   uint8_t trackCount = 0u;
 };
 

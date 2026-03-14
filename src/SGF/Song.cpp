@@ -20,17 +20,34 @@ void SongPlayer::bind(SynthEngine& synth, const Song& song) {
                           : song.laneCount;
   for (uint8_t i = 0u; i < limit; ++i) {
     const SongLane& lane = song.lanes[i];
-    if (lane.instrument == nullptr || lane.pattern == nullptr || lane.voiceIndex < 0) {
+    if (lane.instrument == nullptr || lane.clips == nullptr || lane.clipCount == 0u || lane.voiceIndex < 0) {
       continue;
     }
-    tracks[trackCount].bind(synth, lane.voiceIndex, *lane.instrument, *lane.pattern);
+    if (lane.clips[0].pattern == nullptr) {
+      continue;
+    }
+    LaneState& state = laneStates[trackCount];
+    state.track.bind(synth, lane.voiceIndex, *lane.instrument, *lane.clips[0].pattern);
+    state.lane = &lane;
+    state.clipIndex = 0u;
+    state.repeatIndex = 0u;
+    state.active = true;
     ++trackCount;
   }
 }
 
 void SongPlayer::reset() {
   for (uint8_t i = 0u; i < trackCount; ++i) {
-    tracks[i].reset();
+    LaneState& state = laneStates[i];
+    state.clipIndex = 0u;
+    state.repeatIndex = 0u;
+    state.active = (state.lane != nullptr);
+    if (state.lane != nullptr && state.lane->clipCount > 0u && state.lane->clips[0].pattern != nullptr) {
+      state.track.bindPattern(*state.lane->clips[0].pattern);
+    } else {
+      state.track.reset();
+      state.active = false;
+    }
   }
 }
 
@@ -39,8 +56,37 @@ void SongPlayer::tick() {
     return;
   }
   for (uint8_t i = 0u; i < trackCount; ++i) {
-    tracks[i].tick();
+    LaneState& state = laneStates[i];
+    if (!state.active) {
+      continue;
+    }
+    state.track.tick();
+    if (state.track.finished()) {
+      advanceLane(state);
+    }
   }
+}
+
+void SongPlayer::advanceLane(LaneState& state) {
+  if (!state.active || state.lane == nullptr || state.lane->clips == nullptr || state.lane->clipCount == 0u) {
+    return;
+  }
+
+  const SongClip& currentClip = state.lane->clips[state.clipIndex];
+  if ((state.repeatIndex + 1u) < currentClip.repeats) {
+    ++state.repeatIndex;
+  } else {
+    state.repeatIndex = 0u;
+    state.clipIndex = static_cast<uint16_t>((state.clipIndex + 1u) % state.lane->clipCount);
+  }
+
+  const SongClip& nextClip = state.lane->clips[state.clipIndex];
+  if (nextClip.pattern == nullptr) {
+    state.track.reset();
+    state.active = false;
+    return;
+  }
+  state.track.bindPattern(*nextClip.pattern);
 }
 
 }  // namespace SGFAudio

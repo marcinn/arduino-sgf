@@ -25,8 +25,10 @@ public:
   PatternTrack(SynthEngine& synth, int voiceIndex, const Instrument& instrument, const Pattern& pattern);
 
   void bind(SynthEngine& synth, int voiceIndex, const Instrument& instrument, const Pattern& pattern);
+  void bindPattern(const Pattern& pattern);
   void reset();
   void tick();
+  bool finished() const { return completed; }
 
 private:
   void advance();
@@ -37,6 +39,7 @@ private:
   int voice = -1;
   uint32_t samplesRemaining = 0u;
   uint16_t stepIndex = 0u;
+  bool completed = false;
 };
 
 }  // namespace SGFAudio

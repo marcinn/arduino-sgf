@@ -29,9 +29,15 @@ void PatternTrack::bind(
   reset();
 }
 
+void PatternTrack::bindPattern(const Pattern& pattern) {
+  patternRef = &pattern;
+  reset();
+}
+
 void PatternTrack::reset() {
   samplesRemaining = 0u;
   stepIndex = 0u;
+  completed = false;
   if (synthEngine != nullptr && voice >= 0) {
     synthEngine->noteOff(voice);
   }
@@ -40,6 +46,9 @@ void PatternTrack::reset() {
 void PatternTrack::tick() {
   if (synthEngine == nullptr || instrumentRef == nullptr || patternRef == nullptr ||
       patternRef->steps == nullptr || patternRef->stepCount == 0u || voice < 0) {
+    return;
+  }
+  if (completed) {
     return;
   }
   if (samplesRemaining == 0u) {
@@ -59,7 +68,8 @@ void PatternTrack::advance() {
   if (stepIndex >= patternRef->stepCount) {
     if (!patternRef->loop) {
       synthEngine->noteOff(voice);
-      samplesRemaining = 1u;
+      samplesRemaining = 0u;
+      completed = true;
       return;
     }
     stepIndex = 0u;
