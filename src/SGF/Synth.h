@@ -3,12 +3,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "IAudioSource.h"
+
 namespace SGFAudio {
 
 enum class Waveform : uint8_t {
   Sine = 0,
   Triangle,
   Square,
+  Saw,
 };
 
 enum FilterFlags : uint8_t {
@@ -63,14 +66,14 @@ struct Sfx {
   uint8_t stepCount = 0;
 };
 
-class SynthEngine {
+class SynthEngine : public IAudioSource {
 public:
   static constexpr int MAX_VOICES = 4;
 
   explicit SynthEngine(uint32_t sampleRate = 22050u);
 
   void setSampleRate(uint32_t sampleRate);
-  uint32_t sampleRate() const { return sampleRateHz; }
+  uint32_t sampleRate() const override { return sampleRateHz; }
 
   void setMasterVolume(uint8_t volume);
   uint8_t masterVolume() const { return masterGain; }
@@ -85,7 +88,7 @@ public:
 
   bool voiceActive(int voiceIndex) const;
 
-  int16_t renderSample();
+  int16_t renderSample() override;
   void renderMono(int16_t* samples, size_t sampleCount);
 
 private:

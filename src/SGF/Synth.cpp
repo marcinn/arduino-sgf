@@ -139,8 +139,11 @@ float SynthEngine::waveformSample(Waveform waveform, float phase) {
     case Waveform::Triangle:
       return 1.0f - 4.0f * fabsf(phase - 0.5f);
     case Waveform::Square:
-    default:
       return (phase < 0.5f) ? 1.0f : -1.0f;
+    case Waveform::Saw:
+      return (2.0f * phase) - 1.0f;
+    default:
+      return 0.0f;
   }
 }
 

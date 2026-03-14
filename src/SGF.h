@@ -25,6 +25,7 @@
 #include "SGF/Game.h"
 #include "SGF/HardwareProfile.h"
 #include "SGF/IDisplayBus.h"
+#include "SGF/IAudioSource.h"
 #include "SGF/IFillRect.h"
 #include "SGF/IFont.h"
 #include "SGF/ICollider.h"
