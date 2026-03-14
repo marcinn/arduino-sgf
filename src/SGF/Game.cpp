@@ -22,7 +22,7 @@ uint32_t frameIntervalUs(uint32_t fps) {
 }  // namespace
 
 Game::Game(uint32_t defaultStepUs, uint32_t maxStepUs)
-    : gameProfiler("Game", profilerSlots, PROFILER_SLOT_COUNT) {
+    : gameProfiler("game", profilerSlots, PROFILER_SLOT_COUNT) {
     physicsClock.lastUs = 0;
     physicsClock.defaultStepUs = defaultStepUs;
     physicsClock.maxStepUs = maxStepUs;
