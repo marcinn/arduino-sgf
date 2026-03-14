@@ -2,13 +2,14 @@
 
 #include <Arduino.h>
 
-namespace Font5x7 {
+#include "IFont.h"
 
-using FillRectFn = void (*)(int x, int y, int w, int h, uint16_t color565);
+class Font5x7 : public IFont {
+   public:
+    int glyphWidth() const override;
+    int glyphHeight() const override;
+    int glyphAdvance() const override;
+    uint8_t glyphRowBits(char ch, int row) const override;
+};
 
-int textWidth(const char* s, int scale);
-bool textPixel(const char* s, int scale, int x, int y);
-void drawText(int x, int y, const char* s, int scale, uint16_t color565, FillRectFn fillRect);
-void drawCenteredText(int screenW, int y, const char* s, int scale, uint16_t color565, FillRectFn fillRect);
-
-}  // namespace Font5x7
+extern const Font5x7 FONT_5X7;

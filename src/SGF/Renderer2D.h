@@ -1,0 +1,169 @@
+#pragma once
+
+#include <stdint.h>
+
+#include <array>
+#include <functional>
+
+#include "DirtyRects.h"
+#include "Profiler.h"
+#include "IRenderer.h"
+#include "IRenderTarget.h"
+#include "Scroller.h"
+#include "Sprite.h"
+#include "SpriteLayer.h"
+#include "TileFlusher.h"
+
+// Renderer2D facade that combines hardware scroll, background redraw,
+// sprite overlay, and dirty-tile flushing.
+class Renderer2D : public IRenderer {
+   public:
+    enum ProfilerSlot {
+        RenderCountSlot = 0,
+        FlushCountSlot,
+        PROFILER_SLOT_COUNT
+    };
+
+    class SpriteHandle {
+       public:
+        SpriteHandle() = default;
+
+        bool isBound() const { return sprite != nullptr; }
+
+        void setAnchor(const Vector2f& anchor) {
+            if (!sprite) {
+                return;
+            }
+            sprite->setAnchor(anchor);
+        }
+
+        void setScale(SpriteScale newScale) {
+            if (!sprite) {
+                return;
+            }
+            sprite->setScale(newScale);
+        }
+
+        void setBitmap(const uint16_t* pixels, int width, int height) {
+            if (!sprite) {
+                return;
+            }
+            sprite->setBitmap(pixels, width, height);
+        }
+
+        void setBitmap(const uint16_t* pixels, int width, int height,
+                       uint16_t transparentColor) {
+            if (!sprite) {
+                return;
+            }
+            sprite->setBitmap(pixels, width, height, transparentColor);
+        }
+
+        void setActive(bool enabled) {
+            if (!sprite) {
+                return;
+            }
+            sprite->setActive(enabled);
+        }
+
+        void setPosition(const Vector2i& position) {
+            if (!sprite) {
+                return;
+            }
+            sprite->setPosition(position);
+        }
+
+        void redraw() {
+            if (!sprite) {
+                return;
+            }
+            sprite->redraw();
+        }
+
+       private:
+        friend class Renderer2D;
+
+        explicit SpriteHandle(Sprite* sprite) : sprite(sprite) {}
+
+        Sprite* sprite = nullptr;
+    };
+
+    using BackgroundFn = std::function<void(int x0, int y0, int w, int h, int32_t worldX0,
+                                            int32_t worldY0, uint16_t* buf)>;
+    struct StripDesc {
+        bool alongY = true;   // Active hardware-scroll axis in screen space.
+        int span = 0;         // Strip thickness on the active axis.
+        int w = 0;            // Buffer width.
+        int h = 0;            // Buffer height.
+        int32_t worldX0 = 0;  // Background world origin for the strip buffer.
+        int32_t worldY0 = 0;
+    };
+    using StripFn = std::function<void(const StripDesc& strip, uint16_t* buf)>;
+
+    Renderer2D(IRenderTarget& target, DirtyRects& dirty, int tileW, int tileH);
+
+    void setBackgroundRenderer(const BackgroundFn& fn) { bgFn = fn; }
+    void setStripRenderer(const StripFn& fn) { stripFn = fn; }
+    void setRegionBuffer(uint16_t* buffer) { regionBuf = buffer; }
+    SpriteHandle sprite(int index) { return SpriteHandle(&sprites.sprite(index)); }
+
+    // Scrolls the background by `delta` pixels on the active scroll axis and adds
+    // dirty rects to clean sprite ghosts caused by the hardware scroll.
+    void scroll(int delta, uint16_t* stripBuf, int maxStripLines);
+    // Integrates velocity (px/s) and dt (ms) into whole-pixel scroll steps.
+    void scrollByVelocity(int speedPxPerSec, uint32_t dtMs, uint16_t* stripBuf, int maxStripLines);
+    void resetScrollAccumulator();
+    void configureScroll(uint16_t fixedStart, uint16_t scrollSpan, uint16_t fixedEnd);
+    void configureFullScreenScroll();
+    void resetScrollOffset(uint16_t offset = 0);
+
+    // Optional manual dirty mark for callers that want explicit control.
+    // Renderer2D also auto-tracks sprite bounds across flushes.
+    void markSpriteMovement(const Rect& oldRect, const Rect& newRect);
+
+    // Forces a full-screen redraw on the next flush.
+    void invalidate();
+
+    // Flushes dirty rects: background render -> sprite overlay -> blit.
+    // `regionBuf` must contain at least tileW*tileH pixels.
+    void flush(uint16_t* regionBuf);
+    void render() override;
+    Profiler& profiler() { return rendererProfiler; }
+    const Profiler& profiler() const { return rendererProfiler; }
+
+   private:
+    IRenderTarget& target;
+    HardwareScroller scroller;
+    SpriteLayer sprites;
+    DirtyRects& dirty;
+    TileFlusher flusher;
+    BackgroundFn bgFn{};
+    StripFn stripFn{};
+    uint16_t* regionBuf = nullptr;
+    int tileW;
+    int tileH;
+    int32_t scrollAccumMilliPx = 0;  // signed accumulator: px*ms/s remainder in [-999, 999]
+    struct SpriteSnapshot {
+        bool active = false;
+        Rect bounds{0, 0, 0, 0};
+        uint32_t redrawRevision = 0;
+    };
+    std::array<SpriteSnapshot, SpriteLayer::MAX_SPRITES> spriteSnapshots{};
+    Profiler::Slot profilerSlots[PROFILER_SLOT_COUNT]{};
+    Profiler rendererProfiler;
+#ifdef ENABLE_FPS
+    uint32_t fpsWindowStartMs = 0;
+    uint16_t fpsFrameCount = 0;
+    uint32_t fpsValue = 0;
+    bool fpsOverlayDirty = false;
+#endif
+
+    void addSpriteGhosts(int delta);
+    void trackSpriteChanges();
+    static void spriteBounds(const Sprite& s, Rect* out);
+#ifdef ENABLE_FPS
+    void updateFps();
+    void markFpsDirty() const;
+    void renderFpsOverlay(int x0, int y0, int w, int h, uint16_t* buf);
+#endif
+};

@@ -3,35 +3,235 @@
 SGF is a lightweight C++ support library for small embedded games. It provides timing, rendering, and utility building blocks without imposing a specific engine architecture. All headers are included with the `SGF/` prefix (e.g., `#include "SGF/TileFlusher.h"`).
 
 ## Components
-- **Game**: Base loop with an internal frame clock. Exposes `start()`, `loop()`, and `resetClock()`. Derive from it and implement `onSetup()`, `onPhysics(float delta)`, and `onProcess(float delta)` to integrate your game logic and rendering.
-- **Scene** / **SceneSwitcher**: Lightweight scene interface and dispatcher for title/gameplay/game-over style flows without dynamic allocation.
-- **Actions**: Small input helpers (`DigitalAction`, `PressReleaseAction`) for `pressed` / `justPressed` / confirm-style handling.
-- **IRenderTarget**: Minimal interface for render targets (`width()`, `height()`, `blit565(...)`) to decouple flushing from concrete display drivers.
+- **Game**: Base loop with an internal frame clock. Exposes `start()`, `loop()`, `switchScene(...)`, and `resetActions()`. Derive from it and implement `onSetup()`, `onPhysics(float delta)`, and `onProcess(float delta)` to integrate your game logic and rendering.
+- **Scene** / **SceneSwitcher**: Lightweight scene interface and dispatcher for title/gameplay/game-over style flows without dynamic allocation. `Game` owns one `SceneSwitcher` internally and delegates `onAction`, `onInput`, `onPhysics`, and `onProcess` to the active scene.
+- **Actions**: Input state helpers built around `ActionState`, `ActionBinding`, and `InputEvent`. `Game` updates bound inputs, emits `pressed` / `justPressed` / `justReleased`, and `resetActions()` can resync action state to the current hardware snapshot without emitting edge events.
+- **IRenderTarget**: Minimal interface for render targets (`size()`, `blit565(...)`) to decouple flushing from concrete display drivers.
 - **TileFlusher**: Tile-based dirty-rect flusher. Takes `DirtyRects`, an `IRenderTarget`, and a tile render callback to repaint only modified regions in bounded tiles.
-- **Sprites**: Software sprite layer with fixed slots (sprites + missiles), transparent key, and simple horizontal scaling modes; intended to be composed over a background buffer.
+- **Sprites**: `Sprite`, `Missile`, and `SpriteLayer` provide fixed-slot software sprites over a background buffer. Gameplay code binds renderer sprite handles; the renderer owns sprite storage.
+- **SpriteCharacter / SpriteRigidBody**: Small helpers that bind a renderer sprite handle to a `Character` or `RigidBody` and keep sprite position in sync with object position.
 - **DirtyRects**: Simple registry of rectangles to refresh, with clip/merge helpers to reduce overdraw.
-- **Collision**: Collision helpers, including circle-rectangle intersection.
+- **Collision**: Low-level geometry helpers using `Vector2i` inputs (`aabbHit`, `circleRectHit`, `raycastToRect`, etc.).
+- **StaticBody / BodiesCollider / CollisionSystem**: `StaticBody` is a non-dynamic collidable with position, anchor, and shape. `BodiesCollider` resolves body-vs-body stages for configured bodies. `CollisionSystem` runs a fixed pipeline over statically provided bodies and colliders without dynamic allocation.
+- **RigidBody / Physics**: `RigidBody` stores position, velocity, mass, forces, and `linearDamp`. `Physics` integrates motion, applies gravity, and can reflect velocity with `bounce(...)`; collision detection / clamping stays outside `Physics`.
+- **ICollidable / ICollider / Tile colliders**: `ICollidable` provides collision position, shape, and body type. `ICollider` exposes collision queries plus `resolve(RigidBody&)`, and can participate in a `CollisionSystem` pipeline. `AreaCollider` handles world bounds with per-edge response. `CharTileCollider` is the byte-per-tile variant and `BitTileCollider` is the bit-per-tile variant for tightly packed tile maps.
+- **CollisionDebug**: Debug overlay for `CollisionSystem`. Render it into the normal render pass through an `IFillRect` target so it participates in the same redraw pipeline as the rest of the frame.
 - **Color565**: RGB565 helpers (`Color565::rgb(...)`, `Color565::lighten(...)`, `Color565::darken(...)`, `Color565::bswap(...)`).
 - **FastILI9341**: Display driver for ILI9341 (blitting, backlight control, rotation).
+- **Platform bus adapters**: Keep hardware/platform-specific `IDisplayBus` implementations in separate libraries such as `SGF_ESP32` or `SGF_ArduinoQ`, then include them explicitly from the sketch.
 - **RectFlashAnim**: Utility for animating flashing rectangles, built on `DirtyRects`.
-- **Font5x7**: Fixed 5x7 bitmap font routines (width calculation, pixel sampling, drawing).
+- **IFont / Font5x7 / FontRenderer**: `IFont` describes glyph metrics/rows, `Font5x7` is the built-in 5x7 bitmap font, and `FontRenderer` draws fonts to `IScreen` / `IFillRect`.
+- **TextBlock**: Small text primitive that owns its content/style, marks `DirtyRects` on changes, and renders through `IFont` + `FontRenderer`.
+- **Renderer2D + built-in scroll helper**: `Renderer2D` owns the 1D scroll helper internally and stitches together optional hardware scroll, background redraw, sprites, and dirty-rect tile flushing. The active on-screen axis depends on rotation (portrait: vertical, landscape: horizontal).
 
 ## Typical use
 - Derive your game class from `Game`, override the three lifecycle hooks, and hold your state there.
+- Bind hardware inputs with `ActionBinding` and `configureActions(...)`; `Game` will update the bound inputs and action states each frame.
+- If you use scenes, let `Game` own scene dispatch and enter/switch scenes through `Game::switchScene(...)`.
 - For rendering, adapt your display to `IRenderTarget` (or use a thin adapter) and use `TileFlusher` with a game-provided region renderer to redraw dirty areas efficiently.
-- Leverage `DirtyRects` to mark updates, `Collision` for basic geometry tests, `Color565` for colors, and `FastILI9341` for display control when targeting that controller.
+- Render text through `FontRenderer`; display drivers stay display-only and do not provide `drawText(...)` helpers.
+- Leverage `DirtyRects` to mark updates, `Collision` for basic geometry tests, `Color565` for colors, and pair a display driver such as `FastILI9341` with a platform-specific bus adapter.
+
+## Physics Notes
+- `Physics::integrate(...)` updates velocity and position from accumulated forces, gravity, mass, and `RigidBody::linearDamp`.
+- `Physics::bounce(...)` only reflects velocity along a supplied collision normal; it does not clamp position or detect collisions.
+- `Physics::resolveBodies(...)` is the simple rigid-vs-rigid resolver; it detects body collision internally and applies an impulse using both masses and a caller-supplied restitution.
+- `AreaCollider::resolve(...)` is one simple way to clamp a body to world bounds and then invoke `Physics::bounce(...)`.
+- `AreaCollider` supports separate left/right/top/bottom restitution and an optional `calculateResponse` callback to override the final edge response.
+- `CharTileCollider` and `BitTileCollider` are collider hooks for tile-based worlds; both take a tile buffer, tile-map size, tile size in screen space, and raster bounds, then expose the same `resolve(RigidBody&)` entrypoint through `ICollider`.
+- `CharTileCollider` decides solidity through `checkTileCollisionFn(uint8_t tile)`.
+- `getCollision(...)` returns a `ColliderCollision` with corrected position, collision normal, tile coordinates, tile index, and buffer/bit offsets where applicable.
+- `BodiesCollider` is the body-vs-body/body-vs-static stage for `CollisionSystem`; rigid-vs-rigid uses `Physics::resolveBodies(...)`, rigid-vs-static uses the same pipeline but only the rigid body is moved and bounced.
+
+Minimal collision pipeline example:
+
+```cpp
+RigidBody playerBody;
+RigidBody enemyBody;
+StaticBody wallBody;
+BodiesCollider bodiesCollider;
+AreaCollider boundsCollider;
+ICollidable* bodies[] = {&playerBody, &enemyBody, &wallBody};
+ICollider* colliders[] = {&bodiesCollider, &boundsCollider};
+CollisionSystem collisionSystem;
+
+void setupCollisions() {
+  playerBody.setCollisionShape(CollisionShape::rect(Vector2i{16, 16}));
+  enemyBody.setCollisionShape(CollisionShape::circle(8));
+  wallBody.setCollisionShape(CollisionShape::rect(Vector2i{32, 32}));
+  wallBody.setPosition(Vector2f{80.0f, 40.0f});
+  bodiesCollider.setRestitution(0.7f);
+  collisionSystem.configureBodies(bodies, sizeof(bodies) / sizeof(bodies[0]));
+  collisionSystem.configureColliders(colliders, sizeof(colliders) / sizeof(colliders[0]));
+}
+
+void tickCollisions() {
+  collisionSystem.update(delta);
+}
+```
+
+Debug overlay example inside a render pass:
+
+```cpp
+void renderRegion(BufferFillRect& fillRect) {
+  CollisionDebug::drawSystem(collisionSystem, fillRect,
+                             Color565::rgb(255, 0, 0),
+                             Color565::rgb(0, 255, 0));
+}
+```
+
+Do not draw collision debug directly to the screen outside the normal render pipeline, or the overlay will smear against stale background data.
+
+## Text Rendering
+Text rendering is split into three layers:
+- `IFont`: font description (glyph metrics + row bits)
+- `Font5x7`: built-in bitmap font implementing `IFont`
+- `FontRenderer`: draws an `IFont` to `IScreen` or any `IFillRect`
+
+Draw directly to a screen:
+
+```cpp
+#include "SGF/Font5x7.h"
+#include "SGF/FontRenderer.h"
+
+FontRenderer::drawText(FONT_5X7, gfx, 10, 20, "HELLO", 2, Color565::rgb(255, 255, 255));
+FontRenderer::drawTextCentered(FONT_5X7, gfx, gfx.size().x / 2, 40, "READY", 2,
+                               Color565::rgb(255, 255, 0));
+```
+
+Draw into a region buffer:
+
+```cpp
+#include "SGF/BufferFillRect.h"
+#include "SGF/Font5x7.h"
+#include "SGF/FontRenderer.h"
+
+uint16_t regionBuf[64 * 16];
+BufferFillRect fillRect(0, 0, 64, 16, regionBuf);
+FontRenderer::drawText(FONT_5X7, fillRect, 0, 0, "HUD", 2, Color565::rgb(255, 255, 255));
+```
+
+## SGF CLI
+SGF ships with a small command-line helper at `tools/sgf`. It creates a project skeleton and wraps `arduino-cli` for build, upload, flash, monitor, and cleanup.
+
+### Requirements
+- `arduino-cli` must be available either in `PATH`, in a common system path such as `/usr/bin/arduino-cli` or `/usr/local/bin/arduino-cli`, or under an Arduino IDE directory passed explicitly as `arduino_ide=/path/to/arduino-ide`.
+- Hardware preset definitions are resolved through the `sgf-hardware-presets` Arduino library.
+- Project-local library overrides may be placed in `./libraries`, for example `./libraries/SGF` and `./libraries/sgf-hardware-presets`.
+
+### Project layout
+An SGF project is expected to have a single sketch entrypoint (`*.ino`) in the project root plus optional local source files. The entrypoint may define SGF metadata as comment lines:
+
+```cpp
+// sgf.name: MyGame
+// sgf.boards: unoq, esp32
+// sgf.default_board: unoq
+// sgf.port.unoq: /dev/ttyACM0
+// sgf.port.esp32: /dev/ttyUSB0
+
+#include "SGFHardwarePresets.h"
+```
+
+Supported metadata keys:
+- `sgf.name`: logical sketch name used for staging/build paths.
+- `sgf.boards`: comma-separated board list enabled for this project.
+- `sgf.default_board`: default board when `board=...` is not passed.
+- `sgf.port.<board>`: default serial port for a given board.
+- `sgf.fqbn.<board>`: overrides the default FQBN for a given board.
+- `sgf.options.<board>`: overrides board options passed to `arduino-cli`.
+- `sgf.preset.<board>`: overrides the `SGF_HW_PRESET` define for a given board.
+- `sgf.extra_flags`: appended to build extra flags.
+- `sgf.monitor_config`: default config passed to `arduino-cli monitor`.
+
+### Creating a project
+Create a new project skeleton:
+
+```bash
+/path/to/SGF/tools/sgf init MyGame
+cd MyGame
+```
+
+This creates:
+- `MyGame.ino`
+- `.gitignore`
+
+If you want to use local library checkouts instead of globally installed Arduino libraries, create:
+
+```text
+MyGame/
+  libraries/
+    SGF
+    sgf-hardware-presets
+```
+
+These may be copies or symlinks.
+
+### Building and flashing
+Typical commands:
+
+```bash
+sgf build board=esp32
+sgf flash board=esp32 port=/dev/ttyUSB0
+sgf monitor board=esp32 port=/dev/ttyUSB0
+sgf info
+sgf clean board=esp32
+```
+
+Exported `ENABLE_*` variables are forwarded as preprocessor defines. `PHYSICS_TARGET_FPS`,
+`RENDER_TARGET_FPS`, `SPI_FREQ`, and `DMA_BUS` are also forwarded. Example:
+
+```bash
+ENABLE_CTRL4B=1 sgf flash board=esp32 port=/dev/ttyUSB0
+```
+
+Useful flags during bring-up and profiling:
+- `SPI_FREQ=60` sets SPI frequency to 60 MHz (the helper also accepts raw Hz values).
+- `RENDER_TARGET_FPS=0` disables the render cap.
+- `DMA_BUS=1` enables the alternate DMA bus define used by supported ESP32 ST7789 presets.
+- `ENABLE_PROFILER=1` enables SGF `Profiler` + `SerialMonitor` output in the game loop.
+- `ENABLE_FPS=1` enables the on-screen FPS overlay rendered by `Renderer2D`.
+
+`PHYSICS_TARGET_FPS` and `RENDER_TARGET_FPS` default to `60`. They cap the `Game` physics tick rate and render rate independently. Set either to `0` to disable that limit.
+
+If `arduino-cli` is bundled inside Arduino IDE and not available in `PATH`, pass the IDE root:
+
+```bash
+sgf build board=esp32 arduino_ide=/opt/arduino-ide
+sgf flash board=esp32 port=/dev/ttyUSB0 arduino_ide=/opt/arduino-ide
+```
+
+Supported built-in board aliases are currently:
+- `unoq`
+- `esp32`
 
 ## Example: Game + Scene
 Below is a minimal example showing a game host with a title scene and a play scene. The title scene starts the game on `FIRE`, while the play scene moves a rectangle and redraws only dirty regions.
 
 ```cpp
 #include <Arduino.h>
-#include "SGF/Actions.h"
+#include "SGF_ArduinoQ.h"
+#include "SGF/ActionBinding.h"
+#include "SGF/ActionState.h"
 #include "SGF/Color565.h"
 #include "SGF/DirtyRects.h"
-#include "SGF/FastILI9341.h"
 #include "SGF/Game.h"
 #include "SGF/Scene.h"
+
+#define TFT_CS 10
+#define TFT_DC 9
+#define TFT_RST 8
+#define TFT_LED D6
+
+const SPIArduinoQDisplayBus::Config DISPLAY_BUS_CONFIG = {
+  DEVICE_DT_GET(DT_NODELABEL(spi2)),
+  TFT_CS,
+  TFT_DC,
+  TFT_RST,
+  TFT_LED
+};
+
+SPIArduinoQDisplayBus displayBus(DISPLAY_BUS_CONFIG);
+FastILI9341 gfx(displayBus);
 
 class MiniGame;
 
@@ -39,6 +239,7 @@ class TitleScene : public Scene {
 public:
   explicit TitleScene(MiniGame& game) : game(game) {}
   void onEnter() override;
+  void onInput(const InputEvent& event) override;
   void onPhysics(float delta) override;
   void onProcess(float delta) override;
 
@@ -62,7 +263,8 @@ public:
   MiniGame(FastILI9341& gfx, uint8_t firePin)
     : Game(10000u, 30000u),
       gfx(gfx),
-      pinFire(firePin),
+      fireInput(firePin, true),
+      actionBindings{{fireInput, fireAction}},
       titleScene(*this),
       playScene(*this) {}
 
@@ -70,11 +272,10 @@ public:
 
 private:
   FastILI9341& gfx;
-  uint8_t pinFire = 0;
-  DigitalAction fireAction;
-  PressReleaseAction fireConfirm;
+  DebouncedInputPin fireInput;
+  ActionState fireAction;
+  ActionBinding actionBindings[1];
   DirtyRects dirty;
-  SceneSwitcher sceneSwitcher;
   TitleScene titleScene;
   PlayScene playScene;
 
@@ -106,38 +307,39 @@ private:
   }
 
   void onSetup() override {
-    pinMode(pinFire, INPUT_PULLUP);
-    fireAction.reset(digitalRead(pinFire) == LOW);
+    configureActions(actionBindings, 1);
 
     gfx.begin(24000000u);
-    gfx.screenRotation(FastILI9341::ScreenRotation::Landscape);
+    gfx.screenRotation(ScreenRotation::Landscape);
     gfx.fillScreen565(Color565::rgb(0, 0, 0));
-    sceneSwitcher.setInitial(titleScene);
-    resetClock();
+    switchScene(titleScene);
   }
 
   void onPhysics(float delta) override {
-    fireAction.update(digitalRead(pinFire) == LOW);
-    sceneSwitcher.onPhysics(delta);
+    (void)delta;
   }
 
   void onProcess(float delta) override {
-    sceneSwitcher.onProcess(delta);
+    (void)delta;
   }
 };
 
 void TitleScene::onEnter() {
-  game.fireConfirm.reset();
+  game.resetActions();
   game.gfx.fillScreen565(Color565::rgb(4, 8, 20));
+}
+
+void TitleScene::onInput(const InputEvent& event) {
+  if (!event.isActionJustPressed(game.fireAction)) {
+    return;
+  }
+
+  game.gfx.fillScreen565(Color565::rgb(0, 0, 0));
+  game.switchScene(game.playScene);
 }
 
 void TitleScene::onPhysics(float delta) {
   (void)delta;
-  if (game.fireConfirm.update(game.fireAction)) {
-    game.gfx.fillScreen565(Color565::rgb(0, 0, 0));
-    game.sceneSwitcher.switchTo(game.playScene);
-    game.resetClock();
-  }
 }
 
 void TitleScene::onProcess(float delta) {
@@ -157,8 +359,8 @@ void PlayScene::onPhysics(float delta) {
     game.boxX = 0;
     game.boxVX = -game.boxVX;
   }
-  if (game.boxX > game.gfx.width() - 16) {
-    game.boxX = game.gfx.width() - 16;
+  if (game.boxX > game.gfx.size().x - 16) {
+    game.boxX = game.gfx.size().x - 16;
     game.boxVX = -game.boxVX;
   }
 
@@ -168,7 +370,7 @@ void PlayScene::onPhysics(float delta) {
 
 void PlayScene::onProcess(float delta) {
   (void)delta;
-  game.dirty.clip(game.gfx.width(), game.gfx.height());
+  game.dirty.clip(game.gfx.size().x, game.gfx.size().y);
   game.dirty.mergeAll();
   for (int i = 0; i < game.dirty.count(); ++i) {
     const Rect& r = game.dirty[i];
@@ -182,4 +384,53 @@ void PlayScene::onProcess(float delta) {
 Notes:
 - The host `MiniGame` owns shared state (display, input, scene switcher).
 - Scenes are regular classes with composition (`MiniGame& game`), not subclasses of the game.
-- Keep scene transitions in `onPhysics(...)`, and rendering in `onProcess(...)`.
+- `Game` owns frame timing and scene transitions; use `switchScene(...)` instead of touching the switcher directly from outside engine code.
+- Use `resetActions()` on scene entry when you want to ignore inherited button edges from the previous scene.
+
+## Example: Hardware scrolling with sprites (RiverRaid-style)
+```cpp
+#include "SGF_ArduinoQ.h"
+#include "SGF/IRenderTarget.h"
+#include "SGF/Renderer.h"
+#include "SGF/DirtyRects.h"
+
+SPIArduinoQDisplayBus::Config displayBusConfig = {
+  DEVICE_DT_GET(DT_NODELABEL(spi2)),
+  TFT_CS,
+  TFT_DC,
+  TFT_RST,
+  TFT_LED
+};
+SPIArduinoQDisplayBus displayBus(displayBusConfig);
+FastILI9341 display(displayBus);
+DirtyRects dirty;
+Renderer2D renderer(display, dirty, 16, 16);
+
+uint16_t stripBuf[320 * 16];
+uint16_t regionBuf[16 * 16];
+
+void setup() {
+  // Initialize your display driver and rotation before configuring scroll.
+  renderer.configureFullScreenScroll();
+
+  renderer.setBackgroundRenderer(
+    [&](int x0,int y0,int w,int h,int32_t wx,int32_t wy,uint16_t* buf){
+      drawBackground(wx, wy, w, h, buf);   // active scroll axis is already mapped into wx/wy
+    });
+}
+
+void loopFrame(int d) { // d>0 moves forward on the active scroll axis
+  renderer.scroll(d, stripBuf, 16);       // hardware scroll + sprite ghost cleanup
+  updateSprites(sprites);                 // move sprites; Renderer2D auto-tracks sprite bounds
+  renderer.flush(regionBuf);              // redraw only dirty tiles (background + sprites)
+}
+```
+
+Key points:
+- `scroll` uses the controller hardware scroll path when the target supports it; otherwise `Renderer2D` falls back to a full invalidate.
+- Rotation defines the visible axis: portrait behaves like vertical scrolling, landscape behaves like horizontal scrolling.
+- `setStripRenderer(...)` is optional. Without it, `Renderer2D` renders the exposed strip via `BackgroundFn`.
+- If used, `StripFn` receives a `StripDesc` (axis + `w/h` + world origin) so the callback does not need direct access to a separate scroller object.
+- `Renderer2D::scroll(...)` marks sprite ghost regions caused by hardware scroll.
+- Sprite movement dirty rects are auto-tracked across `flush()` calls (`markSpriteMovement(...)` remains optional).
+- `Renderer2D` combines background render, sprite overlay, and tile-based dirty flushing to minimize SPI traffic.
