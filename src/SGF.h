@@ -48,6 +48,7 @@
 #include "SGF/SpriteRigidBody.h"
 #include "SGF/SpriteLayer.h"
 #include "SGF/StaticBody.h"
+#include "SGF/Synth.h"
 #include "SGF/Missile.h"
 #include "SGF/TextBlock.h"
 #include "SGF/TextSprite.h"
