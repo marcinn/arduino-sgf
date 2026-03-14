@@ -45,6 +45,7 @@
 #include "SGF/Scene.h"
 #include "SGF/Scroller.h"
 #include "SGF/SerialMonitor.h"
+#include "SGF/Song.h"
 #include "SGF/Sprite.h"
 #include "SGF/SpriteCharacter.h"
 #include "SGF/SpriteRigidBody.h"
