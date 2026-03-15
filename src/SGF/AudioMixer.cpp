@@ -32,15 +32,15 @@ int16_t AudioMixer::renderSample() {
     if (sources[i] == nullptr) {
       continue;
     }
-    mixed += static_cast<float>(sources[i]->renderSample()) / 32767.0f;
+    mixed += sources[i]->renderSample() / 32767.0f;
   }
-  mixed *= static_cast<float>(masterGain) / 255.0f;
+  mixed *= masterGain / 255.0f;
   if (mixed > 1.0f) {
     mixed = 1.0f;
   } else if (mixed < -1.0f) {
     mixed = -1.0f;
   }
-  return static_cast<int16_t>(lrintf(mixed * 32767.0f));
+  return lrintf(mixed * 32767.0f);
 }
 
 void AudioMixer::renderMono(int16_t* samples, size_t sampleCount) {

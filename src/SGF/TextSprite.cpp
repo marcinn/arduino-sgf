@@ -1,6 +1,7 @@
 #include "TextSprite.h"
 
 #include <stdlib.h>
+#include <utility>
 
 #include "FontRenderer.h"
 
@@ -12,7 +13,7 @@ TextSprite::TextSprite() = default;
 
 TextSprite::TextSprite(const TextSprite& other) { copyFrom(other); }
 
-TextSprite::TextSprite(TextSprite&& other) noexcept { moveFrom(static_cast<TextSprite&&>(other)); }
+TextSprite::TextSprite(TextSprite&& other) noexcept { moveFrom(std::move(other)); }
 
 TextSprite::~TextSprite() {
     releaseBitmapStorage();
@@ -29,7 +30,7 @@ TextSprite& TextSprite::operator=(const TextSprite& other) {
 TextSprite& TextSprite::operator=(TextSprite&& other) noexcept {
     if (this != &other) {
         releaseBitmapStorage();
-        moveFrom(static_cast<TextSprite&&>(other));
+        moveFrom(std::move(other));
     }
     return *this;
 }

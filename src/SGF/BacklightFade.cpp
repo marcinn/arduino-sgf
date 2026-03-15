@@ -21,8 +21,8 @@ uint8_t BacklightFade::levelAt(uint32_t nowMs) const {
         return targetLevel;
     }
 
-    int32_t delta = (int32_t)targetLevel - (int32_t)startLevel;
-    return (uint8_t)((int32_t)startLevel + (delta * (int32_t)elapsed) / (int32_t)durationMs);
+    int32_t delta = targetLevel - startLevel;
+    return startLevel + (delta * elapsed) / durationMs;
 }
 
 bool BacklightFade::isComplete(uint32_t nowMs) const {

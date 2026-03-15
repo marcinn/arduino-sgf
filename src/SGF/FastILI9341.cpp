@@ -2,6 +2,10 @@
 
 #include "Color565.h"
 
+namespace {
+
+}  // namespace
+
 uint8_t FastILI9341::toMadctl(ScreenRotation rotation) {
     switch (rotation) {
         case ScreenRotation::Portrait:
@@ -73,11 +77,7 @@ void FastILI9341::updateBacklightFade() {
     applyBacklightLevel(backlightFade.levelAt(now));
 }
 
-bool FastILI9341::begin(uint32_t spi_hz) {
-    return begin(spi_hz, toMadctl(ScreenRotation::Landscape));
-}
-
-static inline uint16_t be16(uint16_t v) { return (uint16_t)((v << 8) | (v >> 8)); }
+bool FastILI9341::begin(uint32_t spi_hz) { return begin(spi_hz, toMadctl(ScreenRotation::Landscape)); }
 
 void FastILI9341::cmd(uint8_t c) { bus.writeCommand(c); }
 
@@ -88,28 +88,28 @@ void FastILI9341::streamEnd() { bus.endDataWrite(); }
 
 void FastILI9341::setWindow(int x0, int y0, int x1, int y1) {
     cmd(0x2A);
-    uint16_t xd[2] = {be16((uint16_t)x0), be16((uint16_t)x1)};
-    data((uint8_t*)xd, 4);
+    uint16_t xd[2] = {Color565::bswap(x0), Color565::bswap(x1)};
+    data((const uint8_t*)xd, sizeof(xd));
 
     cmd(0x2B);
-    uint16_t yd[2] = {be16((uint16_t)y0), be16((uint16_t)y1)};
-    data((uint8_t*)yd, 4);
+    uint16_t yd[2] = {Color565::bswap(y0), Color565::bswap(y1)};
+    data((const uint8_t*)yd, sizeof(yd));
 
     cmd(0x2C);
 }
 
 void FastILI9341::setScrollArea(uint16_t topFixed, uint16_t scrollHeight, uint16_t bottomFixed) {
     // VSCRDEF (0x33): 3 words: TFA, VSA, BFA
-    uint16_t def[3] = {be16(topFixed), be16(scrollHeight), be16(bottomFixed)};
+    uint16_t def[3] = {Color565::bswap(topFixed), Color565::bswap(scrollHeight), Color565::bswap(bottomFixed)};
     cmd(0x33);
-    data((uint8_t*)def, 6);
+    data((const uint8_t*)def, sizeof(def));
 }
 
 void FastILI9341::scrollTo(uint16_t yOff) {
     // VSCRSADD (0x37): 1 word, scroll start address (0..VSA-1)
-    uint16_t off = be16(yOff);
+    uint16_t off = Color565::bswap(yOff);
     cmd(0x37);
-    data((uint8_t*)&off, 2);
+    data((const uint8_t*)&off, sizeof(off));
 }
 
 void FastILI9341::hwReset() { bus.hardwareReset(); }

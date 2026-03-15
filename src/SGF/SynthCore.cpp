@@ -29,7 +29,7 @@ void SynthEngine::noteOn(int voiceIndex, NoteProgramRef program, float baseHz, u
   if (program.kind != NoteProgramKind::Synth || program.ptr == nullptr) {
     return;
   }
-  noteOn(voiceIndex, *static_cast<const Instrument*>(program.ptr), baseHz, velocity);
+  noteOn(voiceIndex, *(const Instrument*)(program.ptr), baseHz, velocity);
 }
 
 void SynthEngine::noteOn(int voiceIndex, const Instrument& instrument, float baseHz, uint8_t velocity) {
@@ -62,7 +62,8 @@ void SynthEngine::noteOff(int voiceIndex) {
     return;
   }
   const uint32_t releaseSamples = msToSamples(sampleRateHz, voice.instrument->ampEnv.releaseMs);
-  voice.releaseStep = voice.envelope / static_cast<float>(releaseSamples == 0u ? 1u : releaseSamples);
+  const float releaseSamplesF = releaseSamples == 0u ? 1.0f : releaseSamples;
+  voice.releaseStep = voice.envelope / releaseSamplesF;
   voice.envStage = EnvStage::Release;
 }
 
@@ -105,15 +106,15 @@ int16_t SynthEngine::renderSample() {
     ++activeVoices;
   }
   if (activeVoices > 1) {
-    mixed /= static_cast<float>(activeVoices);
+    mixed /= activeVoices;
   }
-  mixed *= static_cast<float>(masterGain) / 255.0f;
+  mixed *= masterGain / 255.0f;
   if (mixed > 1.0f) {
     mixed = 1.0f;
   } else if (mixed < -1.0f) {
     mixed = -1.0f;
   }
-  return static_cast<int16_t>(lrintf(mixed * 32767.0f));
+  return lrintf(mixed * 32767.0f);
 }
 
 void SynthEngine::renderMono(int16_t* samples, size_t sampleCount) {

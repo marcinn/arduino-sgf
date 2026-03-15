@@ -8,11 +8,10 @@ uint32_t unitsToSamples(uint32_t sampleRate, uint16_t unitMs, uint16_t length, u
   if (sampleRate == 0u || unitMs == 0u || length == 0u) {
     return 1u;
   }
-  const uint32_t durationMs = static_cast<uint32_t>(unitMs) * static_cast<uint32_t>(length);
-  const uint64_t numerator =
-    static_cast<uint64_t>(sampleRate) * static_cast<uint64_t>(durationMs) + remainderMs;
-  const uint32_t samples = static_cast<uint32_t>(numerator / 1000u);
-  remainderMs = static_cast<uint16_t>(numerator % 1000u);
+  const uint32_t durationMs = sampleRate > 0u ? unitMs * length : 0u;
+  const uint64_t numerator = uint64_t(sampleRate) * durationMs + remainderMs;
+  const uint32_t samples = numerator / 1000u;
+  remainderMs = numerator % 1000u;
   return samples == 0u ? 1u : samples;
 }
 

@@ -89,7 +89,7 @@ void FontRenderer::drawText(const IFont& font,
                             const char* text,
                             int scale,
                             uint16_t color565) {
-    drawText(font, static_cast<IFillRect&>(screen), x, y, text, scale, color565);
+    drawText(font, (IFillRect&)(screen), x, y, text, scale, color565);
 }
 
 void FontRenderer::drawTextBlock(const IFont& font,
@@ -112,7 +112,7 @@ void FontRenderer::drawTextBlock(const IFont& font,
                                  int scale,
                                  uint16_t color565,
                                  AlignX align) {
-    drawTextBlock(font, static_cast<IFillRect&>(screen), anchorX, y, text, scale, color565,
+    drawTextBlock(font, (IFillRect&)(screen), anchorX, y, text, scale, color565,
                   align);
 }
 

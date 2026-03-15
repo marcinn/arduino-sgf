@@ -1,11 +1,11 @@
 # CODING_STANDARDS.md
 
 Minimal C++/Arduino guidelines for this repo:
-- Naming: classes/structs `PascalCase`, functions/methods `lowerCamelCase`, variables/members `lowerCamelCase` (no trailing underscores); constants `SCREAMING_SNAKE_CASE` using `constexpr` when possible.
+- Naming: classes/structs `PascalCase`, functions/methods `lowerCamelCase`, variables/members `lowerCamelCase` (no trailing underscores); constants `SCREAMING_SNAKE_CASE`.
 - Every class should have .h and .cpp files
 - There cannot be more than one public clasess in a file
 - Braces on the same line as the header (`if (...) {`), always use braces even for single statements.
-- Prefer `const`/`constexpr` and references over pointers when `nullptr` is not expected.
+- Prefer `const` and references over pointers when `nullptr` is not expected.
 - Avoid dynamic allocation; use static/stack buffers sized for the MCU constraints.
 - Includes: project/local headers in `""`, platform/stdlib in `<...>`; include only what you need.
 - Formatting: 4-space indent, keep lines short (< 100 chars), use spaces after commas and around operators.
@@ -22,3 +22,9 @@ Minimal C++/Arduino guidelines for this repo:
 - Reuse common math/value types (e.g. `Vector2` for 2D position/size) instead of duplicating one-off `Position`/`Size` structs across classes.
 - If object state change has invariants/side effects (e.g. syncing a bound sprite), the state must be changed through the object API (`setPosition`, `setX`, etc.), not by external direct field mutation.
 - Do not add central "sync all objects" sweeps to compensate for leaked state mutation. Update dependent state at the point where the owning object state changes.
+- Stop generating fucking bloat code.
+- Do not cast without a real reason.
+- If a cast is truly necessary, prefer the shortest correct form (`std::move`, a compact `static_cast`, or a tiny typed helper) instead of verbose conversion scaffolding.
+- Do not replace one cast style mechanically with another.
+- Keep code compact; do not split simple one-line expressions into multiple temporaries unless it materially improves correctness or readability.
+- If a value is meant to be tuned from build defines, do not hide it in `static constexpr` or file-local constants. Keep it overrideable from the build.

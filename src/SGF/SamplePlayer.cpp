@@ -36,7 +36,7 @@ void SamplePlayer::noteOn(int voiceIndex, NoteProgramRef program, float baseHz, 
   if (voiceIndex < 0 || voiceIndex >= MAX_VOICES || program.kind != NoteProgramKind::Sample || program.ptr == nullptr) {
     return;
   }
-  const SampleInstrument& instrument = *static_cast<const SampleInstrument*>(program.ptr);
+  const SampleInstrument& instrument = *(const SampleInstrument*)(program.ptr);
   if (instrument.sample == nullptr || instrument.sample->pcm == nullptr || instrument.sample->length == 0u ||
       instrument.sample->sampleRate == 0u) {
     return;
@@ -90,21 +90,29 @@ float SamplePlayer::samplePlayback(Voice& voice, uint32_t sampleRateHz) {
     return 0.0f;
   }
 
-  uint32_t sampleIndex = static_cast<uint32_t>(voice.samplePos);
+  uint32_t sampleIndex = voice.samplePos;
   if (sampleIndex >= sample->length) {
     if (sample->loop && sample->loopEnd > sample->loopStart && sample->loopEnd <= sample->length) {
       const uint32_t loopLen = sample->loopEnd - sample->loopStart;
       sampleIndex = sample->loopStart + ((sampleIndex - sample->loopStart) % loopLen);
-      voice.samplePos = static_cast<float>(sampleIndex);
+      voice.samplePos = sampleIndex;
     } else {
       voice.active = false;
       return 0.0f;
     }
   }
 
-  const float raw = static_cast<float>(sample->pcm[sampleIndex]) / 128.0f;
+  float raw = sample->pcm[sampleIndex] / 128.0f;
+  if (!sample->loop && SGF_SAMPLE_TAIL_FADE_SAMPLES > 0u) {
+    const uint32_t remaining = sample->length - sampleIndex;
+    if (remaining < SGF_SAMPLE_TAIL_FADE_SAMPLES) {
+      const float fadeScale = remaining;
+      raw *= fadeScale / SGF_SAMPLE_TAIL_FADE_SAMPLES;
+    }
+  }
   const float rootHz = (sample->rootHz > 0.0f) ? sample->rootHz : 440.0f;
-  const float step = (static_cast<float>(sample->sampleRate) / static_cast<float>(sampleRateHz)) *
+  const float sampleRateScale = sample->sampleRate;
+  const float step = (sampleRateScale / sampleRateHz) *
                      ((voice.baseHz > 0.0f ? voice.baseHz : rootHz) / rootHz);
   voice.samplePos += (step > 0.0f) ? step : 0.0f;
   return raw;
@@ -121,12 +129,12 @@ int16_t SamplePlayer::renderSample() {
     if (!voice.active) {
       continue;
     }
-    const float velocityGain = static_cast<float>(voice.velocity) / 255.0f;
+    const float velocityGain = voice.velocity / 255.0f;
     const float instrumentGain =
-      static_cast<float>(voice.instrument != nullptr ? voice.instrument->volume : 255u) / 255.0f;
+      (voice.instrument != nullptr ? voice.instrument->volume : 255u) / 255.0f;
     mixed += raw * velocityGain * instrumentGain;
   }
-  return static_cast<int16_t>(lrintf(clampSample(mixed) * 32767.0f));
+  return lrintf(clampSample(mixed) * 32767.0f);
 }
 
 void SamplePlayer::renderMono(int16_t* samples, size_t sampleCount) {

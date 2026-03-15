@@ -1,8 +1,16 @@
 #include "Vector2.h"
 
+namespace {
+
+int roundToInt(float value) {
+    return value >= 0.0f ? value + 0.5f : value - 0.5f;
+}
+
+}  // namespace
+
 Vector2i::Vector2i(const Vector2f& value)
-    : x((int)(value.x >= 0.0f ? value.x + 0.5f : value.x - 0.5f)),
-      y((int)(value.y >= 0.0f ? value.y + 0.5f : value.y - 0.5f)) {}
+    : x(roundToInt(value.x)),
+      y(roundToInt(value.y)) {}
 
 Vector2i& Vector2i::operator+=(const Vector2i& other) {
     x += other.x;
@@ -42,8 +50,8 @@ Vector2i& Vector2i::operator/=(int scalar) {
 
 Vector2f::operator Vector2i() const {
     return Vector2i{
-        (int)(x >= 0.0f ? x + 0.5f : x - 0.5f),
-        (int)(y >= 0.0f ? y + 0.5f : y - 0.5f),
+        roundToInt(x),
+        roundToInt(y),
     };
 }
 

@@ -6,6 +6,10 @@
 #include "IAudioSource.h"
 #include "INotePlayer.h"
 
+#ifndef SGF_SAMPLE_TAIL_FADE_SAMPLES
+#define SGF_SAMPLE_TAIL_FADE_SAMPLES 64u
+#endif
+
 namespace SGFAudio {
 
 class SamplePlayer : public IAudioSource, public INotePlayer {

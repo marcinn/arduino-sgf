@@ -3,7 +3,6 @@
 #include "Color565.h"
 
 namespace {
-uint16_t be16(uint16_t value) { return (uint16_t)((value << 8) | (value >> 8)); }
 constexpr size_t SWAP_CHUNK_PIXELS = 256u;
 
 void writeSwappedPixels565(IDisplayBus& bus, const uint16_t* pix, size_t count) {
@@ -27,14 +26,14 @@ void writeSwappedPixels565(IDisplayBus& bus, const uint16_t* pix, size_t count) 
 uint8_t FastST7789::st7789Madctl(ScreenRotation rotation) {
     switch (rotation) {
         case ScreenRotation::Portrait:
-            return (uint8_t)(MADCTL_MX | MADCTL_MY);
+            return MADCTL_MX | MADCTL_MY;
         case ScreenRotation::Landscape:
-            return (uint8_t)(MADCTL_MY | MADCTL_MV);
+            return MADCTL_MY | MADCTL_MV;
         case ScreenRotation::PortraitFlip:
             return 0;
         case ScreenRotation::LandscapeFlip:
         default:
-            return (uint8_t)(MADCTL_MX | MADCTL_MV);
+            return MADCTL_MX | MADCTL_MV;
     }
 }
 
@@ -109,14 +108,14 @@ FastST7789::Offset FastST7789::currentOffset() const {
 void FastST7789::setWindow(int x0, int y0, int x1, int y1) {
     Offset offset = currentOffset();
 
-    uint16_t xs[2] = {be16((uint16_t)(x0 + offset.x)), be16((uint16_t)(x1 + offset.x))};
-    uint16_t ys[2] = {be16((uint16_t)(y0 + offset.y)), be16((uint16_t)(y1 + offset.y))};
+    uint16_t xs[2] = {Color565::bswap(x0 + offset.x), Color565::bswap(x1 + offset.x)};
+    uint16_t ys[2] = {Color565::bswap(y0 + offset.y), Color565::bswap(y1 + offset.y)};
 
     cmd(0x2A);
-    data((uint8_t*)xs, sizeof(xs));
+    data((const uint8_t*)xs, sizeof(xs));
 
     cmd(0x2B);
-    data((uint8_t*)ys, sizeof(ys));
+    data((const uint8_t*)ys, sizeof(ys));
 
     cmd(0x2C);
 }
@@ -137,7 +136,7 @@ void FastST7789::updateDimensions() {
 
 void FastST7789::screenRotation(ScreenRotation nextRotation) {
     currentRotation = nextRotation;
-    uint8_t madctl = (uint8_t)(st7789Madctl(nextRotation) | panel.colorOrder);
+    uint8_t madctl = st7789Madctl(nextRotation) | panel.colorOrder;
     cmd(0x36);
     data(&madctl, 1);
     updateDimensions();
@@ -154,15 +153,15 @@ bool FastST7789::scrollAxisInverted() const {
 }
 
 void FastST7789::setScrollArea(uint16_t topFixed, uint16_t scrollHeight, uint16_t bottomFixed) {
-    uint16_t def[3] = {be16(topFixed), be16(scrollHeight), be16(bottomFixed)};
+    uint16_t def[3] = {Color565::bswap(topFixed), Color565::bswap(scrollHeight), Color565::bswap(bottomFixed)};
     cmd(0x33);
-    data((uint8_t*)def, sizeof(def));
+    data((const uint8_t*)def, sizeof(def));
 }
 
 void FastST7789::scrollTo(uint16_t yOffset) {
-    uint16_t offset = be16(yOffset);
+    uint16_t offset = Color565::bswap(yOffset);
     cmd(0x37);
-    data((uint8_t*)&offset, sizeof(offset));
+    data((const uint8_t*)&offset, sizeof(offset));
 }
 
 bool FastST7789::begin(uint32_t spi_hz, ScreenRotation initialRotation) {
@@ -273,9 +272,9 @@ void FastST7789::blit565(int x0, int y0, int w, int h, const uint16_t* pix) {
     setWindow(x0, y0, x0 + w - 1, y0 + h - 1);
     streamBegin();
     if (bus.supportsWritePixels565() && !pixelWriteExpectsByteSwapped()) {
-        bus.writePixels565(pix, (size_t)count);
+        bus.writePixels565(pix, count);
     } else if (bus.supportsWritePixels565()) {
-        writeSwappedPixels565(bus, pix, (size_t)count);
+        writeSwappedPixels565(bus, pix, count);
     } else {
         for (int i = 0; i < count; i++) {
             uint16_t swapped = Color565::bswap(pix[i]);
@@ -311,7 +310,7 @@ void FastST7789::writeBlit565StreamChunk(const uint16_t* pix, size_t count) {
 
     for (size_t i = 0; i < count; i++) {
         uint16_t swapped = Color565::bswap(pix[i]);
-            bus.writeDataChunk((const uint8_t*)&swapped, sizeof(swapped));
+        bus.writeDataChunk((const uint8_t*)&swapped, sizeof(swapped));
     }
 }
 

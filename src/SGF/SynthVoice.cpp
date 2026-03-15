@@ -12,7 +12,8 @@ float cutoffAlpha(float cutoffHz, uint32_t sampleRate) {
   if (cutoffHz <= 0.0f || sampleRate == 0u) {
     return 0.0f;
   }
-  const float omega = 2.0f * PI_F * cutoffHz / static_cast<float>(sampleRate);
+  const float sampleRateF = sampleRate;
+  const float omega = 2.0f * PI_F * cutoffHz / sampleRateF;
   return expf(-omega);
 }
 
@@ -33,7 +34,7 @@ void SynthEngine::startVoice(Voice& voice, const Instrument& instrument, float b
   voice.stepElapsedSamples = 0u;
   voice.stepDurationSamples = 0u;
   voice.ageSamples = 0u;
-  voice.noiseState = 0xA341316Cu ^ static_cast<uint32_t>(lrintf(voice.baseHz * 100.0f));
+  voice.noiseState = 0xA341316Cu ^ (uint32_t)(lrintf(voice.baseHz * 100.0f));
   voice.samplePos = 0.0f;
   voice.filter.lowPassState = 0.0f;
   voice.filter.highPassLowState = 0.0f;
@@ -53,7 +54,7 @@ void SynthEngine::retriggerVoice(Voice& voice) {
     voice.envelope = 1.0f;
     voice.envStage = (adsr.decayMs == 0u && adsr.sustain == 255u) ? EnvStage::Sustain : EnvStage::Decay;
     if (adsr.decayMs == 0u) {
-      voice.envelope = static_cast<float>(adsr.sustain) / 255.0f;
+  voice.envelope = adsr.sustain / 255.0f;
       voice.envStage = EnvStage::Sustain;
     }
   } else {
@@ -78,7 +79,7 @@ void SynthEngine::applySfxStep(Voice& voice, const SfxStep& step) {
   voice.stepElapsedSamples = 0u;
   voice.stepDurationSamples = msToSamples(sampleRateHz, step.durationMs);
   if (!step.gate) {
-    noteOff(static_cast<int>(&voice - voices));
+    noteOff((int)(&voice - voices));
     return;
   }
   if (step.retrigger) {
@@ -97,7 +98,7 @@ void SynthEngine::advanceSfx(Voice& voice) {
   ++voice.stepIndex;
   if (voice.stepIndex >= voice.sfx->stepCount) {
     voice.sfx = nullptr;
-    noteOff(static_cast<int>(&voice - voices));
+    noteOff((int)(&voice - voices));
     return;
   }
   applySfxStep(voice, voice.sfx->steps[voice.stepIndex]);
@@ -109,24 +110,24 @@ float SynthEngine::pitchEnvCents(const Voice& voice) const {
     return 0.0f;
   }
   if (voice.instrument->pitchEnvCount == 1u) {
-    return static_cast<float>(voice.instrument->pitchEnv[0].cents);
+    return voice.instrument->pitchEnv[0].cents;
   }
-  const float ageMs = (static_cast<float>(voice.ageSamples) * 1000.0f) / static_cast<float>(sampleRateHz);
+  const float ageMs = (voice.ageSamples * 1000.0f) / sampleRateHz;
   const PitchPoint* points = voice.instrument->pitchEnv;
-  if (ageMs <= static_cast<float>(points[0].timeMs)) {
-    return static_cast<float>(points[0].cents);
+  if (ageMs <= points[0].timeMs) {
+    return points[0].cents;
   }
   for (uint8_t i = 1; i < voice.instrument->pitchEnvCount; ++i) {
-    if (ageMs <= static_cast<float>(points[i].timeMs)) {
-      const float t0 = static_cast<float>(points[i - 1].timeMs);
-      const float t1 = static_cast<float>(points[i].timeMs);
+    if (ageMs <= points[i].timeMs) {
+      const float t0 = points[i - 1].timeMs;
+      const float t1 = points[i].timeMs;
       const float a = (ageMs - t0) / ((t1 - t0) <= 0.0f ? 1.0f : (t1 - t0));
-      const float c0 = static_cast<float>(points[i - 1].cents);
-      const float c1 = static_cast<float>(points[i].cents);
+      const float c0 = points[i - 1].cents;
+      const float c1 = points[i].cents;
       return c0 + (c1 - c0) * a;
     }
   }
-  return static_cast<float>(points[voice.instrument->pitchEnvCount - 1].cents);
+  return points[voice.instrument->pitchEnvCount - 1].cents;
 }
 
 float SynthEngine::lfoCents(Voice& voice) const {
@@ -135,7 +136,7 @@ float SynthEngine::lfoCents(Voice& voice) const {
     return 0.0f;
   }
   const float sample = waveformSample(voice.instrument->pitchLfo.waveform, voice.lfoPhase);
-  voice.lfoPhase += voice.instrument->pitchLfo.rateHz / static_cast<float>(sampleRateHz);
+  voice.lfoPhase += voice.instrument->pitchLfo.rateHz / sampleRateHz;
   if (voice.lfoPhase >= 1.0f) {
     voice.lfoPhase -= floorf(voice.lfoPhase);
   }
@@ -149,11 +150,11 @@ float SynthEngine::nextVoiceSample(Voice& voice) {
   }
 
   advanceSfx(voice);
-  const float pitchCents = static_cast<float>(voice.semitoneOffset * 100) +
-                           static_cast<float>(voice.centsOffset) +
+  const float pitchCents = (voice.semitoneOffset * 100.0f) +
+                           voice.centsOffset +
                            pitchEnvCents(voice) + lfoCents(voice);
   voice.currentHz = voice.baseHz * semitoneRatio(pitchCents / 100.0f);
-  const float phaseStep = voice.currentHz / static_cast<float>(sampleRateHz);
+  const float phaseStep = voice.currentHz / sampleRateHz;
   float raw = 0.0f;
   if (voice.instrument->waveform == Waveform::Noise) {
     raw = noiseSample(voice);
@@ -165,9 +166,9 @@ float SynthEngine::nextVoiceSample(Voice& voice) {
     }
   }
 
-  const float velocityGain = static_cast<float>(voice.velocity) / 255.0f;
-  const float stepGain = static_cast<float>(voice.stepVolume) / 255.0f;
-  const float instrumentGain = static_cast<float>(voice.instrument->volume) / 255.0f;
+  const float velocityGain = voice.velocity / 255.0f;
+  const float stepGain = voice.stepVolume / 255.0f;
+  const float instrumentGain = voice.instrument->volume / 255.0f;
   float sample = raw * voice.envelope * velocityGain * stepGain * instrumentGain;
   sample = applyFilters(voice, sample);
   advanceEnvelope(voice);
@@ -190,11 +191,12 @@ void SynthEngine::advanceEnvelope(Voice& voice) {
   switch (voice.envStage) {
     case EnvStage::Attack: {
       const uint32_t attackSamples = msToSamples(sampleRateHz, adsr.attackMs);
-      voice.envelope += 1.0f / static_cast<float>(attackSamples == 0u ? 1u : attackSamples);
+      const float attackSamplesF = attackSamples == 0u ? 1.0f : attackSamples;
+      voice.envelope += 1.0f / attackSamplesF;
       if (voice.envelope >= 1.0f) {
         voice.envelope = 1.0f;
         if (adsr.decayMs == 0u) {
-          voice.envelope = static_cast<float>(adsr.sustain) / 255.0f;
+          voice.envelope = adsr.sustain / 255.0f;
           voice.envStage = EnvStage::Sustain;
         } else {
           voice.envStage = EnvStage::Decay;
@@ -203,9 +205,10 @@ void SynthEngine::advanceEnvelope(Voice& voice) {
       break;
     }
     case EnvStage::Decay: {
-      const float sustain = static_cast<float>(adsr.sustain) / 255.0f;
+      const float sustain = adsr.sustain / 255.0f;
       const uint32_t decaySamples = msToSamples(sampleRateHz, adsr.decayMs);
-      const float step = (1.0f - sustain) / static_cast<float>(decaySamples == 0u ? 1u : decaySamples);
+      const float decaySamplesF = decaySamples == 0u ? 1.0f : decaySamples;
+      const float step = (1.0f - sustain) / decaySamplesF;
       voice.envelope -= step;
       if (voice.envelope <= sustain) {
         voice.envelope = sustain;
@@ -214,7 +217,7 @@ void SynthEngine::advanceEnvelope(Voice& voice) {
       break;
     }
     case EnvStage::Sustain:
-      voice.envelope = static_cast<float>(adsr.sustain) / 255.0f;
+      voice.envelope = adsr.sustain / 255.0f;
       break;
     case EnvStage::Release:
       voice.envelope -= voice.releaseStep;

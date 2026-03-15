@@ -29,7 +29,7 @@ float SynthEngine::waveformSample(Waveform waveform, float phase) {
 float SynthEngine::noiseSample(Voice& voice) {
   voice.noiseState = voice.noiseState * 1664525u + 1013904223u;
   const uint32_t bits = (voice.noiseState >> 8) & 0xFFFFu;
-  return (static_cast<float>(bits) / 32767.5f) - 1.0f;
+  return (bits / 32767.5f) - 1.0f;
 }
 
 float SynthEngine::clampUnit(float value) {
@@ -50,7 +50,8 @@ uint32_t SynthEngine::msToSamples(uint32_t sampleRate, uint16_t ms) {
   if (ms == 0u || sampleRate == 0u) {
     return 0u;
   }
-  const uint32_t samples = static_cast<uint32_t>((static_cast<uint64_t>(sampleRate) * ms) / 1000u);
+  const uint64_t sampleProduct = (uint64_t)sampleRate * ms;
+  const uint32_t samples = sampleProduct / 1000u;
   return samples == 0u ? 1u : samples;
 }
 

@@ -14,9 +14,7 @@ void SongPlayer::bind(const Song& song) {
     return;
   }
 
-  const uint8_t limit = (song.laneCount > MAX_LANES)
-                          ? static_cast<uint8_t>(MAX_LANES)
-                          : song.laneCount;
+  const uint8_t limit = song.laneCount > MAX_LANES ? MAX_LANES : song.laneCount;
   for (uint8_t i = 0u; i < limit; ++i) {
     const SongLane& lane = song.lanes[i];
     if (lane.player == nullptr || lane.program.ptr == nullptr || lane.clips == nullptr ||
@@ -81,7 +79,7 @@ void SongPlayer::advanceLane(LaneState& state) {
     ++state.repeatIndex;
   } else {
     state.repeatIndex = 0u;
-    state.clipIndex = static_cast<uint16_t>((state.clipIndex + 1u) % state.lane->clipCount);
+    state.clipIndex = (state.clipIndex + 1u) % state.lane->clipCount;
   }
 
   const SongClip& nextClip = state.lane->clips[state.clipIndex];

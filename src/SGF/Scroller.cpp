@@ -31,12 +31,12 @@ void HardwareScroller::configureFullScreen() { configure(0, axisLength(), 0); }
 
 void HardwareScroller::resetOffset(uint16_t yOff) {
     if (scrollH_ == 0) return;
-    offset_ = (uint16_t)(yOff % scrollH_);
+    offset_ = yOff % scrollH_;
     if (hardwareEnabled_) {
-        target_.scrollTo((uint16_t)(topFixed_ + offset_));
+        target_.scrollTo(topFixed_ + offset_);
     }
     // Keep the logical offset aligned with the visible start of the scroll area.
-    worldTop_ = (int32_t)offset_;
+    worldTop_ = offset_;
 }
 
 void HardwareScroller::scroll(int delta, uint16_t* buf, int maxStripLines,
@@ -63,40 +63,40 @@ void HardwareScroller::scroll(int delta, uint16_t* buf, int maxStripLines,
         // scroll address must move in the opposite direction to keep API `delta`
         // semantics stable in screen space.
         const int hwStep = inverted ? -step : step;
-        int newOff = (int)offset_ + hwStep;
-        while (newOff >= (int)scrollH_) newOff -= (int)scrollH_;
-        while (newOff < 0) newOff += (int)scrollH_;
-        offset_ = (uint16_t)newOff;
-        target_.scrollTo((uint16_t)(topFixed_ + offset_));
+        int newOff = offset_ + hwStep;
+        while (newOff >= scrollH_) newOff -= scrollH_;
+        while (newOff < 0) newOff += scrollH_;
+        offset_ = newOff;
+        target_.scrollTo(topFixed_ + offset_);
 
         // Logical offset of the first visible unit in the scroll area.
         worldTop_ += step;
 
         // Newly exposed strip position in logical screen coordinates on the active axis.
         const int stripSpan = std::abs(step);
-        const int screenStripStart = (step > 0) ? ((int)scrollH_ - stripSpan) : 0;
+        const int screenStripStart = step > 0 ? (scrollH_ - stripSpan) : 0;
         int stripPhys =
-            inverted ? (screenStripStart - (int)offset_) : ((int)offset_ + screenStripStart);
-        while (stripPhys >= (int)scrollH_) stripPhys -= (int)scrollH_;
-        while (stripPhys < 0) stripPhys += (int)scrollH_;
+            inverted ? (screenStripStart - offset_) : (offset_ + screenStripStart);
+        while (stripPhys >= scrollH_) stripPhys -= scrollH_;
+        while (stripPhys < 0) stripPhys += scrollH_;
 
         // Logical coordinate of the exposed strip (for world generation).
         const int32_t worldOffset = (step > 0) ? (worldTop_ + scrollH_ - stripSpan) : worldTop_;
-        const int physPosOnScreen = (int)topFixed_ + stripPhys;
+        const int physPosOnScreen = topFixed_ + stripPhys;
 
         renderStrip(worldOffset, stripSpan, buf);
         if (blitStrip) {
             blitStrip(physPosOnScreen, stripSpan, buf);
         } else if (alongY) {
-            const int spanEnd = (int)topFixed_ + (int)scrollH_;
+            const int spanEnd = topFixed_ + scrollH_;
             const int firstSpan = std::min(stripSpan, spanEnd - physPosOnScreen);
             target_.blit565(0, physPosOnScreen, cross, firstSpan, buf);
             const int secondSpan = stripSpan - firstSpan;
             if (secondSpan > 0) {
-                target_.blit565(0, (int)topFixed_, cross, secondSpan, buf + cross * firstSpan);
+                target_.blit565(0, topFixed_, cross, secondSpan, buf + cross * firstSpan);
             }
         } else {
-            const int spanEnd = (int)topFixed_ + (int)scrollH_;
+            const int spanEnd = topFixed_ + scrollH_;
             const int firstSpan = std::min(stripSpan, spanEnd - physPosOnScreen);
             const int secondSpan = stripSpan - firstSpan;
             if (secondSpan <= 0) {
@@ -104,7 +104,7 @@ void HardwareScroller::scroll(int delta, uint16_t* buf, int maxStripLines,
             } else {
                 blitStripSubRectRows(target_, physPosOnScreen, 0, firstSpan, cross, buf, stripSpan,
                                      0);
-                blitStripSubRectRows(target_, (int)topFixed_, 0, secondSpan, cross, buf, stripSpan,
+                blitStripSubRectRows(target_, topFixed_, 0, secondSpan, cross, buf, stripSpan,
                                      firstSpan);
             }
         }
