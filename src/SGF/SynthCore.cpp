@@ -97,16 +97,11 @@ bool SynthEngine::voiceActive(int voiceIndex) const {
 
 int16_t SynthEngine::renderSample() {
   float mixed = 0.0f;
-  int activeVoices = 0;
   for (int i = 0; i < MAX_VOICES; ++i) {
     if (!voices[i].active) {
       continue;
     }
     mixed += nextVoiceSample(voices[i]);
-    ++activeVoices;
-  }
-  if (activeVoices > 1) {
-    mixed /= activeVoices;
   }
   mixed *= masterGain / 255.0f;
   if (mixed > 1.0f) {
