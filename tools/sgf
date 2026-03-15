@@ -290,6 +290,8 @@ Usage:
   $SCRIPT_NAME init [target_dir] [--name PROJECT_NAME] [--force]
   $SCRIPT_NAME build [board=NAME] [port=/dev/ttyXXX] [monitor_config=115200] [arduino_ide=/path] [--clean-build] [-v|--verbose] [-q|--quiet]
   $SCRIPT_NAME elfinfo [board=NAME] [port=/dev/ttyXXX] [monitor_config=115200] [arduino_ide=/path] [--build] [--clean-build] [-v|--verbose] [-q|--quiet] [--units b|kb|mb|auto]
+  $SCRIPT_NAME gentextures [--src DIR] [--out BASENAME]
+  $SCRIPT_NAME gensamples [--src DIR] [--out BASENAME]
   $SCRIPT_NAME flash [board=NAME] [port=/dev/ttyXXX] [arduino_ide=/path] [--clean-build] [-v|--verbose] [-q|--quiet]
   $SCRIPT_NAME upload [board=NAME] [port=/dev/ttyXXX] [arduino_ide=/path] [-v|--verbose] [-q|--quiet]
   $SCRIPT_NAME monitor [board=NAME] [port=/dev/ttyXXX] [monitor_config=115200] [arduino_ide=/path]
@@ -316,6 +318,8 @@ Examples:
   $SCRIPT_NAME build --clean-build board=esp32
   $SCRIPT_NAME elfinfo -q --units kb board=esp32
   $SCRIPT_NAME elfinfo --build --clean-build board=esp32
+  $SCRIPT_NAME gentextures
+  $SCRIPT_NAME gensamples --src alt-samples --out MySamplesGenerated
   DEFINES="APP_FEATURE=1 APP_WIDTH=200 APP_HEIGHT=140" $SCRIPT_NAME build board=esp32
   EXTRA_FLAGS="-DAPP_FEATURE=1 -DAPP_WIDTH=200 -DAPP_HEIGHT=140" $SCRIPT_NAME build board=esp32
   $SCRIPT_NAME build arduino_ide=/opt/arduino-ide board=esp32
@@ -649,6 +653,8 @@ CLI_VERBOSE=0
 CLI_QUIET=0
 CLI_UNITS='auto'
 CLI_ARGS=()
+GEN_SRC_DIR=''
+GEN_OUT_BASE=''
 
 parse_runtime_args() {
   CLI_BOARD=''
@@ -728,6 +734,89 @@ parse_runtime_args() {
       ;;
     *)
       die "--units must be one of: b, kb, mb, auto"
+      ;;
+  esac
+}
+
+parse_generate_args() {
+  GEN_SRC_DIR=''
+  GEN_OUT_BASE=''
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --src)
+        [ "$#" -ge 2 ] || die "--src requires a value"
+        GEN_SRC_DIR="$2"
+        shift
+        ;;
+      --out)
+        [ "$#" -ge 2 ] || die "--out requires a value"
+        GEN_OUT_BASE="$2"
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        die "unknown generator option: $1"
+        ;;
+    esac
+    shift
+  done
+}
+
+find_python3() {
+  local py
+  py="$(command -v python3 2>/dev/null || true)"
+  [ -n "$py" ] || die "python3 is required"
+  printf '%s' "$py"
+}
+
+run_texture_generator() {
+  local project_dir="$1"
+  local src_dir="${2:-textures}"
+  local out_base="${3:-TexturesGenerated}"
+  local py
+
+  py="$(find_python3)"
+  "$py" "$SCRIPT_DIR/generate_textures.py" \
+    --project-dir "$project_dir" \
+    --src-dir "$src_dir" \
+    --out-base "$out_base"
+}
+
+run_sample_generator() {
+  local project_dir="$1"
+  local src_dir="${2:-samples}"
+  local out_base="${3:-SamplesGenerated}"
+  local py
+
+  py="$(find_python3)"
+  "$py" "$SCRIPT_DIR/generate_samples.py" \
+    --project-dir "$project_dir" \
+    --src-dir "$src_dir" \
+    --out-base "$out_base"
+}
+
+run_generate_command() {
+  local action="$1"
+  local src_dir
+  local out_base
+
+  case "$action" in
+    gentextures)
+      src_dir="${GEN_SRC_DIR:-textures}"
+      out_base="${GEN_OUT_BASE:-TexturesGenerated}"
+      run_texture_generator "$PWD" "$src_dir" "$out_base"
+      ;;
+    gensamples)
+      src_dir="${GEN_SRC_DIR:-samples}"
+      out_base="${GEN_OUT_BASE:-SamplesGenerated}"
+      run_sample_generator "$PWD" "$src_dir" "$out_base"
+      ;;
+    *)
+      die "unsupported generator action '$action'"
       ;;
   esac
 }
@@ -884,8 +973,18 @@ run_compile() {
 
 run_project_prebuild() {
   local board="$1"
+  local textures_dir="$PWD/textures"
+  local samples_dir="$PWD/samples"
   local hook="$PWD/tools/sgf-prebuild"
   local py_hook="$PWD/tools/sgf-prebuild.py"
+
+  if [ -d "$textures_dir" ]; then
+    run_texture_generator "$PWD" "textures" "TexturesGenerated"
+  fi
+
+  if [ -d "$samples_dir" ] || [ -f "$PWD/samples.txt" ]; then
+    run_sample_generator "$PWD" "samples" "SamplesGenerated"
+  fi
 
   if [ -x "$hook" ]; then
     SGF_BOARD="$board" SGF_PROJECT_DIR="$PWD" "$hook"
@@ -1518,6 +1617,11 @@ main() {
     init)
       shift
       init_project "$@"
+      ;;
+    gentextures|gensamples)
+      shift
+      parse_generate_args "$@"
+      run_generate_command "$cmd"
       ;;
     build|elfinfo|bininfo|flash|upload|monitor|boards|info|clean)
       shift

@@ -111,6 +111,138 @@ BufferFillRect fillRect(0, 0, 64, 16, regionBuf);
 FontRenderer::drawText(FONT_5X7, fillRect, 0, 0, "HUD", 2, Color565::rgb(255, 255, 255));
 ```
 
+## Audio
+SGF audio is split into a few small pieces:
+- `SynthEngine`: synthesized voices (`Sine`, `Triangle`, `Square`, `Saw`, `Noise`)
+- `SamplePlayer`: PCM sample playback
+- `AudioMixer`: mixes multiple audio sources into one output
+- `SongPlayer` / `PatternTrack`: note scheduling
+- platform output such as `ESP32DacAudioOutput`
+
+### Minimal audio init
+For ESP32, the smallest working setup is one mixer, one or more sources, and one output:
+
+```cpp
+#include "SGF_ESP32.h"
+#include "SGF/AudioMixer.h"
+#include "SGF/SamplePlayer.h"
+#include "SGF/Synth.h"
+
+SGFAudio::SynthEngine synth(11025u);
+SGFAudio::SamplePlayer samples(11025u);
+SGFAudio::AudioMixer mixer(11025u);
+SGFAudio::ESP32DacAudioOutput audioOut(mixer, 25u);
+
+void setupAudio() {
+  mixer.addSource(synth);
+  mixer.addSource(samples);
+  audioOut.begin();
+}
+```
+
+If a project only needs synth or only needs samples, you can add just one source to the mixer.
+
+### Triggering a synth instrument on an event
+Use `SynthEngine::noteOn(...)` for a note and `playSfx(...)` for a short synth effect:
+
+```cpp
+#include "SGF/AudioTypes.h"
+#include "SGF/Synth.h"
+
+SGFAudio::SynthEngine synth(11025u);
+
+constexpr SGFAudio::Instrument kPickupInstrument{
+  .waveform = SGFAudio::Waveform::Sine,
+  .ampEnv = {4u, 24u, 180u, 40u},
+  .volume = 140u,
+};
+
+void playPickup() {
+  synth.noteOn(0, kPickupInstrument, 523.25f, 255u);
+}
+```
+
+Short multi-step synth FX can use `Sfx`:
+
+```cpp
+constexpr SGFAudio::SfxStep kFireSteps[] = {
+  {.durationMs = 40u, .semitoneOffset = 0, .volume = 255u, .gate = true, .retrigger = true},
+  {.durationMs = 30u, .semitoneOffset = -7, .volume = 180u, .gate = true, .retrigger = false},
+};
+
+constexpr SGFAudio::Sfx kFireSfx{
+  .instrument = &kPickupInstrument,
+  .steps = kFireSteps,
+  .stepCount = 2u,
+};
+
+void playFire() {
+  synth.playSfx(kFireSfx, 440.0f, 255u);
+}
+```
+
+### Triggering a sample instrument on an event
+`SamplePlayer` uses `AudioSample` plus a lightweight `SampleInstrument` wrapper:
+
+```cpp
+#include "SGF/AudioTypes.h"
+#include "SGF/SamplePlayer.h"
+
+SGFAudio::SamplePlayer samples(11025u);
+
+constexpr int8_t kClickPcm[] = {0, 48, 96, 64, 24, 0, -18, -8, 0};
+
+constexpr SGFAudio::AudioSample kClickSample{
+  .pcm = kClickPcm,
+  .length = sizeof(kClickPcm) / sizeof(kClickPcm[0]),
+  .sampleRate = 11025u,
+  .rootHz = 1.0f,
+  .loop = false,
+  .loopStart = 0u,
+  .loopEnd = 0u,
+};
+
+constexpr SGFAudio::SampleInstrument kClickInstrument{
+  .sample = &kClickSample,
+  .volume = 255u,
+  .oneShot = true,
+};
+
+void playClick() {
+  samples.playOneShot(kClickInstrument, 255u);
+}
+```
+
+For pitched playback through patterns or songs, bind the sample through `makeProgramRef(...)`:
+
+```cpp
+constexpr SGFAudio::PatternStep kLeadSteps[] = {
+  {.hz = 261.63f, .length = 1u, .velocity = 255u},
+  {.hz = 329.63f, .length = 1u, .velocity = 255u},
+  {.hz = 392.00f, .length = 1u, .velocity = 255u},
+};
+
+constexpr SGFAudio::Pattern kLeadPattern{
+  .steps = kLeadSteps,
+  .stepCount = 3u,
+  .unitMs = 180u,
+  .loop = true,
+};
+
+SGFAudio::PatternTrack sampleTrack(
+  samples,
+  0,
+  SGFAudio::makeProgramRef(kClickInstrument),
+  kLeadPattern
+);
+```
+
+### Notes
+- `AudioMixer` is the normal top-level source passed to the output backend.
+- `ESP32DacAudioOutput` takes any `IAudioSource`, not just synth.
+- For a full song, build lanes with `Song`, `SongLane`, `SongClip`, and `SongPlayer`.
+- For projects with generated PCM assets, keep the generated lookup layer outside gameplay code and feed `AudioSample` pointers into `SampleInstrument`.
+
 ## SGF CLI
 SGF ships with a small command-line helper at `tools/sgf`. It creates a project skeleton and wraps `arduino-cli` for build, upload, flash, monitor, and cleanup.
 
@@ -173,8 +305,23 @@ Typical commands:
 sgf build board=esp32
 sgf flash board=esp32 port=/dev/ttyUSB0
 sgf monitor board=esp32 port=/dev/ttyUSB0
+sgf gentextures
+sgf gensamples
 sgf info
 sgf clean board=esp32
+```
+
+If a project has `textures/` and/or `samples/`, `sgf build` runs the built-in asset generators automatically before compile. The defaults match the Wolf project:
+- `textures/` -> `TexturesGenerated.h/.cpp`
+- `samples/` + `samples.txt` -> `SamplesGenerated.h/.cpp`
+
+You can also run the generators directly:
+
+```bash
+sgf gentextures
+sgf gentextures --src alt-textures --out MyTexturesGenerated
+sgf gensamples
+sgf gensamples --src alt-samples --out MySamplesGenerated
 ```
 
 Exported `ENABLE_*` variables are forwarded as preprocessor defines. `PHYSICS_TARGET_FPS`,
