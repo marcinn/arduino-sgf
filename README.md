@@ -117,6 +117,7 @@ SGF audio is split into a few small pieces:
 - `SamplePlayer`: PCM sample playback
 - `AudioMixer`: mixes multiple audio sources into one output
 - `SongPlayer` / `PatternTrack`: note scheduling
+- `MusicPlayer`: high-level song playback over synth/sample engines
 - platform output such as `ESP32DacAudioOutput`
 
 ### Minimal audio init
@@ -141,6 +142,20 @@ void setupAudio() {
 ```
 
 If a project only needs synth or only needs samples, you can add just one source to the mixer.
+
+If a project wants music as a single reusable runtime object, use `MusicPlayer`:
+
+```cpp
+#include "SGF_ESP32.h"
+#include "SGF/MusicPlayer.h"
+
+SGFAudio::MusicPlayer music(11025u);
+SGFAudio::ESP32DacAudioOutput audioOut(music, 25u);
+
+void setupAudio() {
+  audioOut.begin();
+}
+```
 
 ### Triggering a synth instrument on an event
 Use `SynthEngine::noteOn(...)` for a note and `playSfx(...)` for a short synth effect:
@@ -237,10 +252,65 @@ SGFAudio::PatternTrack sampleTrack(
 );
 ```
 
+### Songs and MusicPlayer
+`Song` is project-defined data. `MusicPlayer` is the runtime player:
+
+```cpp
+#include "SGF/MusicPlayer.h"
+#include "SGF/Song.h"
+
+constexpr SGFAudio::Instrument kTitleLead{
+  .waveform = SGFAudio::Waveform::Sine,
+  .ampEnv = {10u, 40u, 180u, 50u},
+  .volume = 140u,
+};
+
+constexpr SGFAudio::PatternStep kTitleSteps[] = {
+  {.hz = 261.63f, .length = 1u, .velocity = 255u},
+  {.hz = 329.63f, .length = 1u, .velocity = 255u},
+  {.hz = 392.00f, .length = 1u, .velocity = 255u},
+};
+
+constexpr SGFAudio::Pattern kTitlePattern{
+  .steps = kTitleSteps,
+  .stepCount = 3u,
+  .unitMs = 180u,
+  .loop = true,
+};
+
+constexpr SGFAudio::SongClip kTitleClips[] = {
+  {.pattern = &kTitlePattern, .repeats = 1u},
+};
+
+SGFAudio::SongLane titleLanes[] = {
+  {
+    .voiceIndex = 0,
+    .program = SGFAudio::makeProgramRef(kTitleLead),
+    .clips = kTitleClips,
+    .clipCount = 1u,
+  },
+};
+
+SGFAudio::Song titleSong{
+  .lanes = titleLanes,
+  .laneCount = 1u,
+};
+
+SGFAudio::MusicPlayer music(11025u);
+
+void enterTitleScreen() {
+  music.play(titleSong);
+}
+
+void leaveTitleScreen() {
+  music.stop(250u);
+}
+```
+
 ### Notes
 - `AudioMixer` is the normal top-level source passed to the output backend.
 - `ESP32DacAudioOutput` takes any `IAudioSource`, not just synth.
-- For a full song, build lanes with `Song`, `SongLane`, `SongClip`, and `SongPlayer`.
+- For a full song, define `Song`, `SongLane`, and `SongClip` in the project, then hand them to `MusicPlayer`.
 - For projects with generated PCM assets, keep the generated lookup layer outside gameplay code and feed `AudioSample` pointers into `SampleInstrument`.
 
 ## SGF CLI

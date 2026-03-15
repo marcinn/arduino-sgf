@@ -2,30 +2,30 @@
 
 namespace SGFAudio {
 
-SongPlayer::SongPlayer(const Song& song) {
-  bind(song);
+SongPlayer::SongPlayer(const Song& song, INotePlayer& player) {
+  bind(song, player);
 }
 
-void SongPlayer::bind(const Song& song) {
+void SongPlayer::bind(const Song& song, INotePlayer& player) {
   songRef = &song;
+  notePlayer = &player;
   trackCount = 0u;
 
-  if (song.lanes == nullptr || song.laneCount == 0u) {
+  if (song.lanes == nullptr || song.laneCount == 0u || notePlayer == nullptr) {
     return;
   }
 
   const uint8_t limit = song.laneCount > MAX_LANES ? MAX_LANES : song.laneCount;
   for (uint8_t i = 0u; i < limit; ++i) {
     const SongLane& lane = song.lanes[i];
-    if (lane.player == nullptr || lane.program.ptr == nullptr || lane.clips == nullptr ||
-        lane.clipCount == 0u || lane.voiceIndex < 0) {
+    if (lane.program.ptr == nullptr || lane.clips == nullptr || lane.clipCount == 0u || lane.voiceIndex < 0) {
       continue;
     }
     if (lane.clips[0].pattern == nullptr) {
       continue;
     }
     LaneState& state = laneStates[trackCount];
-    state.track.bind(*lane.player, lane.voiceIndex, lane.program, *lane.clips[0].pattern);
+    state.track.bind(*notePlayer, lane.voiceIndex, lane.program, *lane.clips[0].pattern);
     state.lane = &lane;
     state.clipIndex = 0u;
     state.repeatIndex = 0u;

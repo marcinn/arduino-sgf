@@ -39,6 +39,7 @@
 #include "SGF/IScreen.h"
 #include "SGF/InputPin.h"
 #include "SGF/Math.h"
+#include "SGF/MusicPlayer.h"
 #include "SGF/Pattern.h"
 #include "SGF/Physics.h"
 #include "SGF/Profiler.h"
