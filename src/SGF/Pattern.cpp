@@ -8,7 +8,7 @@ uint32_t unitsToSamples(uint32_t sampleRate, uint16_t unitMs, uint16_t length, u
   if (sampleRate == 0u || unitMs == 0u || length == 0u) {
     return 1u;
   }
-  const uint32_t durationMs = sampleRate > 0u ? unitMs * length : 0u;
+  const uint32_t durationMs = uint32_t(unitMs) * length;
   const uint64_t numerator = uint64_t(sampleRate) * durationMs + remainderMs;
   const uint32_t samples = numerator / 1000u;
   remainderMs = numerator % 1000u;
@@ -68,6 +68,12 @@ void PatternTrack::tick() {
   }
 }
 
+void PatternTrack::advanceSamples(uint32_t sampleCount) {
+  for (uint32_t i = 0u; i < sampleCount; ++i) {
+    tick();
+  }
+}
+
 void PatternTrack::advance() {
   if (notePlayer == nullptr || programRef.ptr == nullptr || patternRef == nullptr ||
       patternRef->steps == nullptr || patternRef->stepCount == 0u || voice < 0) {
@@ -91,8 +97,9 @@ void PatternTrack::advance() {
     notePlayer->noteOff(voice);
   }
 
+  const uint16_t unitMs = unitMsOverride > 0u ? unitMsOverride : patternRef->unitMs;
   samplesRemaining = unitsToSamples(
-    notePlayer->sampleRate(), patternRef->unitMs, step.length, sampleRemainder);
+    notePlayer->sampleRate(), unitMs, step.length, sampleRemainder);
   ++stepIndex;
 }
 

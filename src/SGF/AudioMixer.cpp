@@ -26,6 +26,15 @@ void AudioMixer::setMasterVolume(uint8_t volume) {
   masterGain = volume;
 }
 
+void AudioMixer::advanceSamples(uint32_t sampleCount) {
+  for (uint8_t i = 0u; i < sourceCount; ++i) {
+    if (sources[i] == nullptr) {
+      continue;
+    }
+    sources[i]->advanceSamples(sampleCount);
+  }
+}
+
 int16_t AudioMixer::renderSample() {
   float mixed = 0.0f;
   for (uint8_t i = 0u; i < sourceCount; ++i) {

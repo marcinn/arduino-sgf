@@ -27,12 +27,14 @@ public:
   const SamplePlayer& samples() const { return samplePlayer; }
 
   uint32_t sampleRate() const override { return mixer.sampleRate(); }
+  void advanceSamples(uint32_t sampleCount) override;
   void noteOn(int voiceIndex, NoteProgramRef program, float baseHz, uint8_t velocity = 255) override;
   void noteOff(int voiceIndex) override;
   bool voiceActive(int voiceIndex) const override;
   int16_t renderSample() override;
 
 private:
+  static uint16_t unitMsFromSong(const Song& song);
   void startFade(uint8_t targetVolume, uint16_t fadeMs);
   void finishStop();
 

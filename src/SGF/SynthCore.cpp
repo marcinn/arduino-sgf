@@ -23,6 +23,7 @@ void SynthEngine::setMasterVolume(uint8_t volume) {
 
 void SynthEngine::reset() {
   memset(voices, 0, sizeof(voices));
+  nextAllocVoice = 0;
 }
 
 void SynthEngine::noteOn(int voiceIndex, NoteProgramRef program, float baseHz, uint8_t velocity) {
@@ -81,14 +82,16 @@ void SynthEngine::triggerSfx(int voiceIndex, const Sfx& sfx, float baseHz, uint8
 }
 
 int SynthEngine::playSfx(const Sfx& sfx, float baseHz, uint8_t velocity) {
-  for (int i = 0; i < MAX_VOICES; ++i) {
-    if (!voices[i].active) {
-      triggerSfx(i, sfx, baseHz, velocity);
-      return i;
-    }
+  int voiceIndex = findFreeVoice();
+  if (voiceIndex < 0) {
+    voiceIndex = findOldestVoice();
   }
-  triggerSfx(0, sfx, baseHz, velocity);
-  return 0;
+  if (voiceIndex < 0) {
+    voiceIndex = 0;
+  }
+  nextAllocVoice = (voiceIndex + 1) % MAX_VOICES;
+  triggerSfx(voiceIndex, sfx, baseHz, velocity);
+  return voiceIndex;
 }
 
 bool SynthEngine::voiceActive(int voiceIndex) const {
@@ -119,6 +122,31 @@ void SynthEngine::renderMono(int16_t* samples, size_t sampleCount) {
   for (size_t i = 0; i < sampleCount; ++i) {
     samples[i] = renderSample();
   }
+}
+
+int SynthEngine::findFreeVoice() const {
+  for (int offset = 0; offset < MAX_VOICES; ++offset) {
+    const int voiceIndex = (nextAllocVoice + offset) % MAX_VOICES;
+    if (!voices[voiceIndex].active) {
+      return voiceIndex;
+    }
+  }
+  return -1;
+}
+
+int SynthEngine::findOldestVoice() const {
+  int bestIndex = -1;
+  uint32_t bestAge = 0u;
+  for (int i = 0; i < MAX_VOICES; ++i) {
+    if (!voices[i].active) {
+      continue;
+    }
+    if (bestIndex < 0 || voices[i].ageSamples > bestAge) {
+      bestIndex = i;
+      bestAge = voices[i].ageSamples;
+    }
+  }
+  return bestIndex;
 }
 
 }  // namespace SGFAudio

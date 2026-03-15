@@ -43,8 +43,11 @@ private:
 
   uint32_t sampleRateHz = 22050u;
   Voice voices[MAX_VOICES]{};
+  int nextAllocVoice = 0;
 
   static float samplePlayback(Voice& voice, uint32_t sampleRateHz);
+  int findFreeVoice() const;
+  int findOldestVoice() const;
 };
 
 }  // namespace SGFAudio

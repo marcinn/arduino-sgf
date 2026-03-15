@@ -26,6 +26,7 @@ SamplePlayer::SamplePlayer(uint32_t sampleRate) {
 
 void SamplePlayer::reset() {
   memset(voices, 0, sizeof(voices));
+  nextAllocVoice = 0;
 }
 
 void SamplePlayer::setSampleRate(uint32_t sampleRate) {
@@ -72,14 +73,16 @@ void SamplePlayer::playOneShot(int voiceIndex, const SampleInstrument& instrumen
 }
 
 int SamplePlayer::playOneShot(const SampleInstrument& instrument, uint8_t velocity) {
-  for (int i = 0; i < MAX_VOICES; ++i) {
-    if (!voices[i].active) {
-      playOneShot(i, instrument, velocity);
-      return i;
-    }
+  int voiceIndex = findFreeVoice();
+  if (voiceIndex < 0) {
+    voiceIndex = findOldestVoice();
   }
-  playOneShot(0, instrument, velocity);
-  return 0;
+  if (voiceIndex < 0) {
+    voiceIndex = 0;
+  }
+  nextAllocVoice = (voiceIndex + 1) % MAX_VOICES;
+  playOneShot(voiceIndex, instrument, velocity);
+  return voiceIndex;
 }
 
 float SamplePlayer::samplePlayback(Voice& voice, uint32_t sampleRateHz) {
@@ -144,6 +147,31 @@ void SamplePlayer::renderMono(int16_t* samples, size_t sampleCount) {
   for (size_t i = 0; i < sampleCount; ++i) {
     samples[i] = renderSample();
   }
+}
+
+int SamplePlayer::findFreeVoice() const {
+  for (int offset = 0; offset < MAX_VOICES; ++offset) {
+    const int voiceIndex = (nextAllocVoice + offset) % MAX_VOICES;
+    if (!voices[voiceIndex].active) {
+      return voiceIndex;
+    }
+  }
+  return -1;
+}
+
+int SamplePlayer::findOldestVoice() const {
+  int bestIndex = -1;
+  float bestPos = -1.0f;
+  for (int i = 0; i < MAX_VOICES; ++i) {
+    if (!voices[i].active) {
+      continue;
+    }
+    if (bestIndex < 0 || voices[i].samplePos > bestPos) {
+      bestIndex = i;
+      bestPos = voices[i].samplePos;
+    }
+  }
+  return bestIndex;
 }
 
 }  // namespace SGFAudio

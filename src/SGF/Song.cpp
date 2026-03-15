@@ -26,6 +26,7 @@ void SongPlayer::bind(const Song& song, INotePlayer& player) {
     }
     LaneState& state = laneStates[trackCount];
     state.track.bind(*notePlayer, lane.voiceIndex, lane.program, *lane.clips[0].pattern);
+    state.track.setUnitMsOverride(unitMsOverride);
     state.lane = &lane;
     state.clipIndex = 0u;
     state.repeatIndex = 0u;
@@ -42,6 +43,7 @@ void SongPlayer::reset() {
     state.active = (state.lane != nullptr);
     if (state.lane != nullptr && state.lane->clipCount > 0u && state.lane->clips[0].pattern != nullptr) {
       state.track.reset();
+      state.track.setUnitMsOverride(unitMsOverride);
       state.track.bindPattern(*state.lane->clips[0].pattern, false);
     } else {
       state.track.reset();
@@ -69,6 +71,12 @@ void SongPlayer::tick() {
   }
 }
 
+void SongPlayer::advanceSamples(uint32_t sampleCount) {
+  for (uint32_t i = 0u; i < sampleCount; ++i) {
+    tick();
+  }
+}
+
 void SongPlayer::advanceLane(LaneState& state) {
   if (!state.active || state.lane == nullptr || state.lane->clips == nullptr || state.lane->clipCount == 0u) {
     return;
@@ -88,6 +96,7 @@ void SongPlayer::advanceLane(LaneState& state) {
     state.active = false;
     return;
   }
+  state.track.setUnitMsOverride(unitMsOverride);
   state.track.bindPattern(*nextClip.pattern, true);
 }
 

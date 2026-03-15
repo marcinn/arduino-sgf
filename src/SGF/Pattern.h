@@ -27,6 +27,8 @@ public:
 
   void bind(INotePlayer& player, int voiceIndex, NoteProgramRef program, const Pattern& pattern);
   void bindPattern(const Pattern& pattern, bool preserveTiming = true);
+  void setUnitMsOverride(uint16_t unitMs) { unitMsOverride = unitMs; }
+  void advanceSamples(uint32_t sampleCount);
   void reset();
   void tick();
   bool finished() const { return completed; }
@@ -43,6 +45,7 @@ private:
   uint16_t stepIndex = 0u;
   bool completed = false;
   uint16_t sampleRemainder = 0u;
+  uint16_t unitMsOverride = 0u;
 };
 
 }  // namespace SGFAudio

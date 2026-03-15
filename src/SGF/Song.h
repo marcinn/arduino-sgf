@@ -21,6 +21,8 @@ struct SongClip {
 struct Song {
   const SongLane* lanes = nullptr;
   uint8_t laneCount = 0;
+  uint16_t bpm = 0u;
+  uint8_t stepsPerBeat = 4u;
 };
 
 class SongPlayer {
@@ -29,6 +31,8 @@ public:
   SongPlayer(const Song& song, INotePlayer& player);
 
   void bind(const Song& song, INotePlayer& player);
+  void setUnitMsOverride(uint16_t unitMs) { unitMsOverride = unitMs; }
+  void advanceSamples(uint32_t sampleCount);
   void reset();
   void tick();
 
@@ -48,6 +52,7 @@ private:
   static constexpr uint8_t MAX_LANES = 8;
   LaneState laneStates[MAX_LANES]{};
   uint8_t trackCount = 0u;
+  uint16_t unitMsOverride = 0u;
 };
 
 }  // namespace SGFAudio

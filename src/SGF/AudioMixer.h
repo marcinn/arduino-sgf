@@ -20,6 +20,7 @@ public:
   uint8_t masterVolume() const { return masterGain; }
 
   uint32_t sampleRate() const override { return sampleRateHz; }
+  void advanceSamples(uint32_t sampleCount) override;
   int16_t renderSample() override;
   void renderMono(int16_t* samples, size_t sampleCount);
 

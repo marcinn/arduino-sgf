@@ -93,12 +93,15 @@ private:
   uint32_t sampleRateHz = 22050u;
   uint8_t masterGain = 255;
   Voice voices[MAX_VOICES]{};
+  int nextAllocVoice = 0;
 
   static float waveformSample(Waveform waveform, float phase);
   static float noiseSample(Voice& voice);
   static float clampUnit(float value);
   static float semitoneRatio(float semitones);
   static uint32_t msToSamples(uint32_t sampleRate, uint16_t ms);
+  int findFreeVoice() const;
+  int findOldestVoice() const;
 
   void startVoice(Voice& voice, const Instrument& instrument, float baseHz, uint8_t velocity);
   void retriggerVoice(Voice& voice);

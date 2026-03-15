@@ -23,12 +23,25 @@ MusicPlayer::MusicPlayer(uint32_t sampleRate)
   mixer.addSource(samplePlayer);
 }
 
+uint16_t MusicPlayer::unitMsFromSong(const Song& song) {
+  if (song.bpm == 0u || song.stepsPerBeat == 0u) {
+    return 0u;
+  }
+  const uint32_t denom = song.bpm * song.stepsPerBeat;
+  if (denom == 0u) {
+    return 0u;
+  }
+  const uint32_t rounded = (60000u + (denom / 2u)) / denom;
+  return rounded > 0u ? rounded : 1u;
+}
+
 void MusicPlayer::play(const Song& song, bool restart) {
   if (!restart && currentSong == &song && sequenceActive) {
     return;
   }
   currentSong = &song;
   stopPending = false;
+  songPlayer.setUnitMsOverride(unitMsFromSong(song));
   songPlayer.bind(song, *this);
   sequenceActive = true;
   gainCurrent = steadyVolume;
@@ -77,27 +90,32 @@ bool MusicPlayer::voiceActive(int voiceIndex) const {
   return synthEngine.voiceActive(voiceIndex) || samplePlayer.voiceActive(voiceIndex);
 }
 
-int16_t MusicPlayer::renderSample() {
-  if (sequenceActive) {
-    songPlayer.tick();
-  }
+void MusicPlayer::advanceSamples(uint32_t sampleCount) {
+  for (uint32_t i = 0u; i < sampleCount; ++i) {
+    if (sequenceActive) {
+      songPlayer.tick();
+    }
 
-  int16_t sample = mixer.renderSample();
-
-  if (gainSamplesRemaining > 0u && gainSamples > 0u) {
-    const uint32_t progressed = gainSamples - gainSamplesRemaining + 1u;
-    gainCurrent = gainStart + ((gainTarget - gainStart) * progressed) / gainSamples;
-    --gainSamplesRemaining;
-    if (gainSamplesRemaining == 0u) {
-      gainCurrent = gainTarget;
-      if (stopPending && gainCurrent == 0) {
-        finishStop();
-        return 0;
+    if (gainSamplesRemaining > 0u && gainSamples > 0u) {
+      const uint32_t progressed = gainSamples - gainSamplesRemaining + 1u;
+      gainCurrent = gainStart + ((gainTarget - gainStart) * progressed) / gainSamples;
+      --gainSamplesRemaining;
+      if (gainSamplesRemaining == 0u) {
+        gainCurrent = gainTarget;
+        if (stopPending && gainCurrent == 0) {
+          finishStop();
+          return;
+        }
       }
     }
   }
+}
 
-  return (sample * gainCurrent) / 255;
+int16_t MusicPlayer::renderSample() {
+  if (stopPending && gainCurrent == 0) {
+    return 0;
+  }
+  return (mixer.renderSample() * gainCurrent) / 255;
 }
 
 void MusicPlayer::startFade(uint8_t targetVolume, uint16_t fadeMs) {
