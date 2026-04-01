@@ -1,0 +1,28 @@
+#pragma once
+
+#include <stdint.h>
+
+#include "IFillRect.h"
+#include "Vector2.h"
+
+enum class ScreenRotation : uint8_t {
+    Portrait = 0,
+    Landscape = 1,
+    PortraitFlip = 2,
+    LandscapeFlip = 3,
+};
+
+class IScreen : public IFillRect {
+   public:
+    virtual ~IScreen() = default;
+
+    virtual void setRotation(ScreenRotation rotation) = 0;
+    virtual ScreenRotation rotation() const = 0;
+
+    virtual Vector2i size() const = 0;
+
+    virtual void fillScreen565(uint16_t color565) = 0;
+
+    virtual void setBacklight(uint8_t level) = 0;
+    virtual uint8_t backlight() const = 0;
+};
